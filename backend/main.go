@@ -79,9 +79,16 @@ func main() {
 	{
 		tickets.POST("", ticketH.SubmitTicket)
 		tickets.GET("", ticketH.ListTickets)
+		tickets.GET("/export", ticketH.ExportTickets)
+		tickets.POST("/batch-delete", ticketH.BatchDelete)
 		tickets.GET("/:ticket_id", ticketH.GetTicket)
+		tickets.PATCH("/:ticket_id", ticketH.PatchTicket)
+		tickets.DELETE("/:ticket_id", ticketH.DeleteTicket)
 		tickets.POST("/:ticket_id/answer", ticketH.AnswerTicket)
 		tickets.POST("/:ticket_id/close", ticketH.CloseTicket)
+		tickets.POST("/:ticket_id/reopen", ticketH.ReopenTicket)
+		tickets.POST("/:ticket_id/archive", ticketH.ArchiveTicket)
+		tickets.POST("/:ticket_id/unarchive", ticketH.UnarchiveTicket)
 	}
 
 	// ─── Auth 受保护端点（仅 JWT）───
@@ -110,7 +117,7 @@ func main() {
 	}
 }
 
-// ensureDefaultAdmin 首次启动时插入默认 admin；如果已存在但密码不匹配 env，重置之（便于测试/重置）
+// ensureDefaultAdmin 首次启动时插入默认 admin；已存在则不重置密码（保护用户已修改的密码）
 func ensureDefaultAdmin(db *gorm.DB, cfg *config.Config) {
 	var admin models.User
 	err := db.Where("username = ?", cfg.AdminUser).First(&admin).Error
@@ -135,17 +142,11 @@ func ensureDefaultAdmin(db *gorm.DB, cfg *config.Config) {
 			cfg.AdminUser, cfg.AdminPass)
 		return
 	}
-	// admin 已存在：检查密码是否匹配 env，不匹配则重置（dev/test 友好）
-	if bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(cfg.AdminPass)) != nil {
-		hash, _ := bcrypt.GenerateFromPassword([]byte(cfg.AdminPass), bcrypt.DefaultCost)
-		admin.PasswordHash = string(hash)
-		admin.MustChangePwd = true
+	// admin 已存在：不再强制重置密码，避免覆盖用户已修改的密码
+	// 若需要重置，请通过管理后台 /api/v1/users/:id PATCH 显式操作
+	if !admin.Active {
 		admin.Active = true
-		if err := db.Save(&admin).Error; err != nil {
-			log.Printf("⚠ Failed to reset admin password: %v", err)
-		} else {
-			log.Printf("🔄 Admin password reset to env value (MUST change on next login)")
-		}
+		_ = db.Save(&admin)
 	}
 }
 
