@@ -1,0 +1,157 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+
+	"ticket-system/config"
+	"ticket-system/handlers"
+	"ticket-system/middleware"
+	"ticket-system/models"
+)
+
+func main() {
+	cfg := config.Load()
+
+	// 初始化数据库
+	db, err := gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	if err := db.AutoMigrate(&models.Ticket{}, &models.User{}); err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
+	}
+	log.Printf("Database ready: %s", cfg.DatabaseURL)
+
+	// 初始化默认 admin（首次启动）
+	ensureDefaultAdmin(db, cfg)
+
+	// 初始化 handler
+	ticketH := handlers.New(db, cfg)
+	authH := handlers.NewAuth(db, cfg)
+	userH := handlers.NewUser(db)
+
+	// 路由
+	r := gin.Default()
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "X-API-Key", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	// 健康检查（无需鉴权）
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "ticket-system"})
+	})
+
+	// ─── Auth 公开端点（无需 token）───
+	api := r.Group("/api/v1")
+	api.POST("/auth/login", authH.Login)
+
+	// ─── 鉴权辅助中间件：双轨（API Key 或 JWT）───
+	// 智能体走 API Key，后台用户走 JWT，二选一
+	dualAuth := func(c *gin.Context) {
+		// 优先检查 JWT
+		auth := c.GetHeader("Authorization")
+		if len(auth) > 7 && auth[:7] == "Bearer " {
+			log.Printf("[dualAuth] JWT path, auth head len=%d", len(auth))
+			middleware.JWTAuth(cfg, db)(c)
+			return
+		}
+		log.Printf("[dualAuth] APIKey path, auth head=[%s]", auth)
+		// fallback 到 API Key
+		middleware.APIKeyAuth(cfg.APIKey)(c)
+	}
+
+	// ─── 工单 API（双轨：API Key 给智能体 / JWT 给后台）───
+	tickets := api.Group("/tickets")
+	tickets.Use(dualAuth)
+	{
+		tickets.POST("", ticketH.SubmitTicket)
+		tickets.GET("", ticketH.ListTickets)
+		tickets.GET("/:ticket_id", ticketH.GetTicket)
+		tickets.POST("/:ticket_id/answer", ticketH.AnswerTicket)
+		tickets.POST("/:ticket_id/close", ticketH.CloseTicket)
+	}
+
+	// ─── Auth 受保护端点（仅 JWT）───
+	auth := api.Group("/auth")
+	auth.Use(middleware.JWTAuth(cfg, db))
+	{
+		auth.GET("/me", authH.Me)
+		auth.POST("/change-password", authH.ChangePassword)
+	}
+
+	// ─── User 管理（仅 JWT + admin）───
+	users := api.Group("/users")
+	users.Use(middleware.JWTAuth(cfg, db))
+	users.Use(middleware.RequireRole("admin"))
+	{
+		users.GET("", userH.ListUsers)
+		users.POST("", userH.CreateUser)
+		users.PATCH("/:id", userH.UpdateUser)
+	}
+
+	addr := cfg.Host + ":" + cfg.Port
+	log.Printf("Starting server on %s (API key: %s...)", addr, maskKey(cfg.APIKey))
+	log.Printf("Default admin: %s / (set ADMIN_PASSWORD env to override)", cfg.AdminUser)
+	if err := r.Run(addr); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
+}
+
+// ensureDefaultAdmin 首次启动时插入默认 admin；如果已存在但密码不匹配 env，重置之（便于测试/重置）
+func ensureDefaultAdmin(db *gorm.DB, cfg *config.Config) {
+	var admin models.User
+	err := db.Where("username = ?", cfg.AdminUser).First(&admin).Error
+	if err == gorm.ErrRecordNotFound {
+		// 首次启动：创建默认 admin
+		hash, hErr := bcrypt.GenerateFromPassword([]byte(cfg.AdminPass), bcrypt.DefaultCost)
+		if hErr != nil {
+			log.Fatalf("Failed to hash admin password: %v", hErr)
+		}
+		newAdmin := models.User{
+			Username:      cfg.AdminUser,
+			PasswordHash:  string(hash),
+			Role:          "admin",
+			DisplayName:   "系统管理员",
+			Active:        true,
+			MustChangePwd: true,
+		}
+		if err := db.Create(&newAdmin).Error; err != nil {
+			log.Fatalf("Failed to create default admin: %v", err)
+		}
+		log.Printf("✨ Default admin created: username=%s password=%s (MUST change on first login!)",
+			cfg.AdminUser, cfg.AdminPass)
+		return
+	}
+	// admin 已存在：检查密码是否匹配 env，不匹配则重置（dev/test 友好）
+	if bcrypt.CompareHashAndPassword([]byte(admin.PasswordHash), []byte(cfg.AdminPass)) != nil {
+		hash, _ := bcrypt.GenerateFromPassword([]byte(cfg.AdminPass), bcrypt.DefaultCost)
+		admin.PasswordHash = string(hash)
+		admin.MustChangePwd = true
+		admin.Active = true
+		if err := db.Save(&admin).Error; err != nil {
+			log.Printf("⚠ Failed to reset admin password: %v", err)
+		} else {
+			log.Printf("🔄 Admin password reset to env value (MUST change on next login)")
+		}
+	}
+}
+
+func maskKey(k string) string {
+	if len(k) <= 8 {
+		return k
+	}
+	return k[:4] + "***" + k[len(k)-4:]
+}

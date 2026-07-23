@@ -1,0 +1,341 @@
+/* ============================================
+   全局设计系统：CSS 变量 + 主题切换
+   ============================================ */
+
+:root {
+  /* 强调色 - 石小易青绿调 */
+  --color-primary: #00b894;
+  --color-primary-light: #00cec9;
+  --color-primary-dark: #009478;
+  --color-primary-soft: rgba(0, 184, 148, 0.08);
+
+  /* 亮色模式 - 渐变色更柔和 */
+  --bg-base: #f7f9fc;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-hover: #f1f3f5;
+  --bg-active: #e9ecef;
+
+  --text-primary: #1a1d29;
+  --text-secondary: #5a6172;
+  --text-tertiary: #9097a3;
+  --text-inverse: #ffffff;
+
+  --border-color: #e6e8eb;
+  --border-soft: #f0f1f3;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.08);
+
+  --gradient-header: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+  --gradient-soft: linear-gradient(135deg, #f0fbf8 0%, #e6f9f5 100%);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --sidebar-width: 232px;
+  --header-height: 64px;
+}
+
+/* 暗色模式 */
+html.dark {
+  --bg-base: #0f1115;
+  --bg-surface: #1a1d24;
+  --bg-elevated: #232730;
+  --bg-hover: #2a2f3a;
+  --bg-active: #353b48;
+
+  --text-primary: #e8eaed;
+  --text-secondary: #a8adb8;
+  --text-tertiary: #6c7280;
+  --text-inverse: #0f1115;
+
+  --border-color: #2d3139;
+  --border-soft: #232730;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  --gradient-soft: linear-gradient(135deg, #1a2826 0%, #142826 100%);
+
+  --color-primary-soft: rgba(0, 184, 148, 0.15);
+}
+
+/* ============================================
+   基础样式
+   ============================================ */
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+/* ============================================
+   滚动条
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ============================================
+   通用工具
+   ============================================ */
+.surface-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.surface-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-soft);
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--gradient-header);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-card .stat-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.stat-card .stat-value {
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+
+.stat-card .stat-meta {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-base);
+}
+
+.theme-toggle:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  transform: rotate(20deg);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--transition-base);
+}
+
+/* 页面进入动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+.slide-enter-from {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
+}
+
+/* Element Plus 主题色覆写 */
+html.dark .el-card {
+  background: var(--bg-surface) !important;
+  border-color: var(--border-soft) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-table,
+html.dark .el-table__inner-wrapper,
+html.dark .el-table tr,
+html.dark .el-table th.el-table__cell,
+html.dark .el-table td.el-table__cell {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-soft) !important;
+}
+
+html.dark .el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell {
+  background: var(--bg-hover) !important;
+}
+
+html.dark .el-input__wrapper,
+html.dark .el-textarea__inner,
+html.dark .el-select__wrapper {
+  background: var(--bg-elevated) !important;
+  box-shadow: 0 0 0 1px var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-descriptions__label {
+  color: var(--text-secondary) !important;
+}
+
+html.dark .el-descriptions__content {
+  color: var(--text-primary) !important;
+  background: var(--bg-elevated) !important;
+}
+
+html.dark .el-descriptions__cell {
+  border-color: var(--border-soft) !important;
+}
+
+html.dark .el-form-item__label {
+  color: var(--text-secondary) !important;
+}
+
+html.dark .el-dialog {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-dialog__title {
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-pagination {
+  color: var(--text-secondary) !important;
+}
+
+html.dark .el-pagination .btn-next,
+html.dark .el-pagination .btn-prev,
+html.dark .el-pagination .el-pager li {
+  background: var(--bg-elevated) !important;
+  color: var(--text-secondary) !important;
+}
+
+html.dark .el-pagination .el-pager li.is-active {
+  background: var(--color-primary) !important;
+  color: #fff !important;
+}
+
+html.dark .el-empty__description p {
+  color: var(--text-tertiary) !important;
+}
+
+html.dark .el-divider__text {
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-button--default {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-button--default:hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+html.dark .el-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+html.dark .el-message-box {
+  background: var(--bg-surface) !important;
+}
+
+html.dark .el-message-box__title,
+html.dark .el-message-box__content,
+html.dark .el-message-box__message,
+html.dark .el-message-box__message p {
+  color: var(--text-primary) !important;
+}
+
+html.dark .el-empty__image svg {
+  fill: var(--bg-elevated) !important;
+}

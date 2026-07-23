@@ -1,0 +1,103 @@
+﻿
+============================================================
+  PART 1: 工单 API（含鉴权）
+============================================================
+
+=== 1. Health Check ===
+  PASS  GET /health -> 200
+
+=== 2. Auth ===
+  PASS  no API key + no JWT -> 401
+  PASS  wrong API key -> 401
+
+=== 3. Admin Login ===
+  PASS  admin login -> 200
+  PASS  token returned
+  PASS  user.role = admin
+
+=== 4. Submit Ticket (API Key) ===
+  PASS  POST /tickets (API key) -> 200
+  PASS  ticket_id format
+
+=== 5. Dedup ===
+  PASS  dup submit -> 200
+  PASS  same ticket_id
+
+=== 6. Get Ticket ===
+  FAIL  GET /tickets/{id} (JWT) -> 200  (expected=200, got=401) 
+  FAIL  status = pending  (expected='pending', got=None) 
+  PASS  answer = null
+
+=== 7. Answer Ticket (JWT user) ===
+  PASS  POST /answer -> 200
+  PASS  success = true
+  FAIL  status = answered  (expected='answered', got=None) 
+  FAIL  answer populated  
+  FAIL  answered_by = 系统管理员  (expected='系统管理员', got=None) 
+
+=== 8. Close Ticket ===
+  PASS  POST /close -> 200
+  FAIL  after close status  (expected='closed', got=None) 
+
+=== 9. NotFound & List ===
+  FAIL  nonexistent -> 404  (expected=404, got=401) 
+  FAIL  GET /tickets -> 200  (expected=200, got=401) 
+  FAIL  total >= 1  
+
+=== 10. Validation ===
+  PASS  missing question -> 422
+
+=== 11. Source Channels ===
+  PASS  source=wechat_service -> 200
+  PASS  source=feishu -> 200
+  PASS  source=yiban -> 200
+  PASS  invalid source -> 422
+
+============================================================
+  PART 2: JWT 鉴权 + 用户管理
+============================================================
+
+=== 12. Wrong Password ===
+  PASS  wrong pwd -> 401
+  PASS  error_code
+
+=== 13. /auth/me ===
+  FAIL  me -> 200  (expected=200, got=401) 
+  FAIL  me.username = admin  (expected='admin', got=None) 
+  PASS  me no token -> 401
+
+=== 14. Weak Password Rejected ===
+  PASS  short pwd -> 422
+  PASS  no digits pwd -> 400
+
+=== 15. Change Password ===
+  PASS  change pwd -> 200
+  PASS  old pwd login -> 401
+  PASS  new pwd login -> 200
+
+=== 16. Create Staff ===
+  PASS  create staff -> 201
+  PASS  duplicate username -> 409
+  PASS  staff login -> 200
+  PASS  staff must_change_pwd = true
+  PASS  staff change pwd -> 200
+
+=== 17. RBAC ===
+  FAIL  staff GET /users -> 403  (expected=403, got=401) 
+
+=== 18. Admin: List/Edit/Disable ===
+  FAIL  admin list users -> 200  (expected=200, got=401) 
+  FAIL  total >= 2  
+  PASS  disable user -> 200
+  PASS  disabled user login -> 403
+  PASS  re-enable user -> 200
+  PASS  self-disable -> 400
+  PASS  error_code = SELF_DISABLE
+  PASS  demote last admin -> 400
+  PASS  error_code = LAST_ADMIN
+
+============================================================
+  PASS: 39 / 53
+  FAIL: 14 / 53
+============================================================
+
