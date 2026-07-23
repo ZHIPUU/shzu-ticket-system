@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -18,6 +20,58 @@ import (
 )
 
 func main() {
+	// 子命令：reset-admin <new-password> — 一次性重置 admin 密码
+	resetCmd := flag.NewFlagSet("reset-admin", flag.ExitOnError)
+	if len(os.Args) >= 2 && os.Args[1] == "reset-admin" {
+		_ = resetCmd.Parse(os.Args[2:])
+		if resetCmd.NArg() < 1 {
+			log.Fatal("用法: ticket-server reset-admin <new-password>")
+		}
+		newPwd := resetCmd.Arg(0)
+		cfg := config.Load()
+		db, err := gorm.Open(sqlite.Open(cfg.DatabaseURL), &gorm.Config{})
+		if err != nil {
+			log.Fatalf("打开 db 失败: %v", err)
+		}
+		// 兼容空 db
+		if err := db.AutoMigrate(&models.Ticket{}, &models.User{}); err != nil {
+			log.Fatalf("迁移失败: %v", err)
+		}
+		// 如果 admin 不存在，先创建
+		var admin models.User
+		if err := db.Where("username = ?", cfg.AdminUser).First(&admin).Error; err == gorm.ErrRecordNotFound {
+			hash, _ := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
+			newAdmin := models.User{
+				Username:      cfg.AdminUser,
+				PasswordHash:  string(hash),
+				Role:          "admin",
+				DisplayName:   "系统管理员",
+				Active:        true,
+				MustChangePwd: true,
+			}
+			if err := db.Create(&newAdmin).Error; err != nil {
+				log.Fatalf("创建 admin 失败: %v", err)
+			}
+			log.Printf("✅ admin 已创建: username=%s password=%s", cfg.AdminUser, newPwd)
+			return
+		} else if err != nil {
+			log.Fatalf("查询失败: %v", err)
+		}
+		// admin 已存在：重置密码
+		hash, _ := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
+		res := db.Model(&models.User{}).Where("username = ?", cfg.AdminUser).
+			Updates(map[string]interface{}{
+				"password_hash":   string(hash),
+				"must_change_pwd": true,
+				"active":          true,
+			})
+		if res.Error != nil {
+			log.Fatalf("更新失败: %v", res.Error)
+		}
+		log.Printf("✅ admin 密码已重置为: %s  (RowsAffected=%d)", newPwd, res.RowsAffected)
+		return
+	}
+
 	cfg := config.Load()
 
 	// 初始化数据库
