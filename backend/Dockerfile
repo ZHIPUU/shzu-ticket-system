@@ -3,7 +3,7 @@ FROM golang:1.22-alpine AS build
 WORKDIR /src
 
 # 国内网络加速
-# RUN go env -w GOPROXY=https://goproxy.cn,direct
+RUN go env -w GOPROXY=https://goproxy.cn,direct
 
 COPY go.mod go.sum* ./
 RUN go mod download
