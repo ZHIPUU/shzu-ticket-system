@@ -3,154 +3,307 @@
     <!-- 面包屑 -->
     <div class="breadcrumb">
       <span class="crumb" @click="$router.push('/tickets')">工单列表</span>
-      <span class="sep">/</span>
+      <ChevronRight :size="14" :stroke-width="2" class="sep-icon" />
       <span class="crumb current">{{ ticket?.ticket_id || '加载中...' }}</span>
     </div>
 
     <template v-if="ticket">
-      <!-- 头部信息卡 -->
-      <el-card class="header-card" shadow="never">
-        <div class="header-content">
-          <div class="header-main">
-            <div class="ticket-id-large">
-              <span class="status-dot" :data-status="ticket.status"></span>
-              <span class="id-text">{{ ticket.ticket_id }}</span>
-              <span class="status-pill" :data-status="ticket.status">{{ statusLabel(ticket.status) }}</span>
+      <!-- 头部摘要卡 -->
+      <SectionCard :padded="false">
+        <div class="header-pad">
+          <div class="header-row">
+            <div class="header-left">
+              <div class="ticket-id-row">
+                <code class="ticket-id">{{ ticket.ticket_id }}</code>
+                <StatusBadge :status="ticket.status" />
+                <ArchivedBadge v-if="ticket.archived" :archived-at="ticket.archived_at" />
+                <CategoryBadge :category="ticket.category" />
+              </div>
+              <div class="header-meta">
+                <span class="meta-item">
+                  <Clock :size="14" :stroke-width="2" />
+                  <span>创建于</span>
+                  <DateTimeText :value="ticket.created_at" mode="datetime" />
+                </span>
+                <span v-if="ticket.answered_at" class="meta-item">
+                  <MessageSquareCheck :size="14" :stroke-width="2" />
+                  <span>答复于</span>
+                  <DateTimeText :value="ticket.answered_at" mode="datetime" />
+                </span>
+                <span v-if="ticket.status === 'closed' && ticket.archived_at" class="meta-item">
+                  <Archive :size="14" :stroke-width="2" />
+                  <span>归档于</span>
+                  <DateTimeText :value="ticket.archived_at" mode="datetime" />
+                </span>
+              </div>
             </div>
-            <div class="meta-row">
-              <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                {{ formatTime(ticket.created_at) }}
-              </span>
-              <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                {{ sourceLabel(ticket.source) }}
-              </span>
-              <span class="meta-item">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {{ ticket.user_id }}
-              </span>
+            <div class="header-right">
+              <el-button v-if="ticket.archived" size="default" @click="onUnarchive" :loading="busy">
+                <ArchiveRestore :size="16" :stroke-width="2" />
+                <span>取消归档</span>
+              </el-button>
+              <el-button v-else size="default" @click="onArchive" :loading="busy">
+                <Archive :size="16" :stroke-width="2" />
+                <span>归档</span>
+              </el-button>
+              <el-dropdown trigger="click" @command="onAction">
+                <el-button :loading="busy">
+                  <span>更多</span>
+                  <ChevronDown :size="14" :stroke-width="2" />
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-if="ticket.status === 'closed'" command="reopen">
+                      <RotateCcw :size="14" :stroke-width="2" />
+                      <span>重开工单</span>
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>
+                      <span class="danger-text">
+                        <Trash2 :size="14" :stroke-width="2" />
+                        删除工单
+                      </span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </div>
-          <div class="header-actions" v-if="ticket.status !== 'closed'">
-            <el-button type="primary" size="default" @click="answerVisible = true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              答复
-            </el-button>
-            <el-button @click="onClose" plain size="default">关闭</el-button>
-          </div>
         </div>
-      </el-card>
+      </SectionCard>
 
-      <!-- 用户问题 -->
-      <el-card class="section-card" shadow="never">
-        <template #header>
-          <div class="section-header">
-            <span class="section-icon">💬</span>
-            <span class="section-title">用户问题</span>
-          </div>
-        </template>
-        <div class="question-box">{{ ticket.question }}</div>
-        <div v-if="ticket.rag_result" class="rag-result">
-          <div class="rag-label">知识库检索结果</div>
-          <div class="rag-content">{{ ticket.rag_result }}</div>
+      <!-- 两列布局：左侧详情 / 右侧操作面板 -->
+      <div class="detail-grid">
+        <!-- 左 -->
+        <div class="detail-main">
+          <!-- 用户问题 -->
+          <SectionCard title="用户问题" icon="HelpCircle" :padded="false">
+            <div class="content-pad">
+              <div class="question-box">{{ ticket.question }}</div>
+            </div>
+          </SectionCard>
+
+          <!-- 答复（内联编辑器） -->
+          <SectionCard title="人工答复" icon="MessageSquareText" :padded="false">
+            <template #header>
+              <span v-if="ticket.answered_at" class="header-tag">
+                <MessageSquareCheck :size="12" :stroke-width="2.4" />
+                <span>已答复</span>
+              </span>
+              <span v-else class="header-tag warn">
+                <MessageSquare :size="12" :stroke-width="2.4" />
+                <span>待答复</span>
+              </span>
+            </template>
+            <div class="content-pad">
+              <div v-if="!editingAnswer" class="answer-view">
+                <div v-if="ticket.answer" class="answer-text">{{ ticket.answer }}</div>
+                <EmptyState
+                  v-else
+                  icon="MessageSquare"
+                  title="尚未答复"
+                  description="点击下方按钮开始答复"
+                />
+                <div class="answer-actions">
+                  <el-button v-if="ticket.status !== 'closed'" type="primary" @click="enterEditAnswer">
+                    <Pencil v-if="ticket.answer" :size="14" :stroke-width="2" />
+                    <Plus v-else :size="14" :stroke-width="2" />
+                    <span style="margin-left: 4px">{{ ticket.answer ? '编辑答复' : '撰写答复' }}</span>
+                  </el-button>
+                  <el-button v-else disabled>
+                    工单已关闭
+                  </el-button>
+                </div>
+              </div>
+              <div v-else class="answer-edit">
+                <el-input
+                  v-model="answerDraft"
+                  type="textarea"
+                  :rows="8"
+                  maxlength="5000"
+                  show-word-limit
+                  placeholder="请输入标准答复内容（可重复编辑覆盖）"
+                  ref="answerInputRef"
+                />
+                <div class="edit-actions">
+                  <el-button @click="cancelEditAnswer">取消</el-button>
+                  <el-button type="primary" :loading="answerSubmitting" @click="saveAnswer">
+                    <Save :size="14" :stroke-width="2" />
+                    <span style="margin-left: 4px">保存答复</span>
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <!-- 关闭信息 -->
+          <SectionCard v-if="ticket.status === 'closed' && ticket.close_reason" title="关闭原因" icon="Lock" :padded="false">
+            <div class="content-pad">
+              <div class="close-reason">{{ ticket.close_reason }}</div>
+            </div>
+          </SectionCard>
         </div>
-        <div v-else class="rag-empty">知识库完全无结果</div>
-      </el-card>
 
-      <!-- 人工答复 -->
-      <el-card class="section-card" shadow="never">
-        <template #header>
-          <div class="section-header">
-            <span class="section-icon">✨</span>
-            <span class="section-title">人工答复</span>
-            <span v-if="ticket.answered_at" class="section-meta">
-              {{ ticket.answered_by }} · {{ formatTime(ticket.answered_at) }}
-            </span>
-          </div>
-        </template>
-        <div v-if="ticket.answer" class="answer-box">
-          {{ ticket.answer }}
+        <!-- 右 -->
+        <div class="detail-side">
+          <!-- 元信息 -->
+          <SectionCard title="工单信息" icon="Info" :padded="false">
+            <div class="content-pad">
+              <el-descriptions :column="1" border size="small" class="info-desc">
+                <el-descriptions-item label="提交人">
+                  <span class="mono">{{ ticket.user_id }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="来源">
+                  <span>{{ SOURCE_LABEL[ticket.source] || ticket.source || '—' }}</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="分类">
+                  <CategoryBadge :category="ticket.category" />
+                </el-descriptions-item>
+                <el-descriptions-item label="状态">
+                  <StatusBadge :status="ticket.status" />
+                </el-descriptions-item>
+                <el-descriptions-item label="归档">
+                  <span v-if="ticket.archived" class="archived-text">已归档</span>
+                  <span v-else class="muted">未归档</span>
+                </el-descriptions-item>
+                <el-descriptions-item label="创建时间">
+                  <DateTimeText :value="ticket.created_at" mode="datetime" />
+                </el-descriptions-item>
+                <el-descriptions-item v-if="ticket.answered_at" label="答复时间">
+                  <DateTimeText :value="ticket.answered_at" mode="datetime" />
+                </el-descriptions-item>
+                <el-descriptions-item v-if="ticket.archived_at" label="归档时间">
+                  <DateTimeText :value="ticket.archived_at" mode="datetime" />
+                </el-descriptions-item>
+              </el-descriptions>
+            </div>
+          </SectionCard>
+
+          <!-- 操作 -->
+          <SectionCard title="操作" icon="Settings2" :padded="false">
+            <div class="content-pad">
+              <div class="action-list">
+                <el-button
+                  v-if="ticket.status !== 'closed'"
+                  class="action-btn"
+                  type="primary"
+                  :loading="busy"
+                  @click="enterEditAnswer"
+                >
+                  <MessageSquareText :size="16" :stroke-width="2" />
+                  <span>{{ ticket.answer ? '编辑答复' : '答复工单' }}</span>
+                </el-button>
+                <el-button
+                  v-if="ticket.status !== 'closed'"
+                  class="action-btn"
+                  :loading="busy"
+                  @click="onClose"
+                >
+                  <Lock :size="16" :stroke-width="2" />
+                  <span>关闭工单</span>
+                </el-button>
+                <el-button
+                  v-if="ticket.status === 'closed'"
+                  class="action-btn"
+                  :loading="busy"
+                  @click="onReopen"
+                >
+                  <RotateCcw :size="16" :stroke-width="2" />
+                  <span>重开工单</span>
+                </el-button>
+                <el-button
+                  v-if="!ticket.archived"
+                  class="action-btn"
+                  :loading="busy"
+                  @click="onArchive"
+                >
+                  <Archive :size="16" :stroke-width="2" />
+                  <span>归档工单</span>
+                </el-button>
+                <el-button
+                  v-else
+                  class="action-btn"
+                  :loading="busy"
+                  @click="onUnarchive"
+                >
+                  <ArchiveRestore :size="16" :stroke-width="2" />
+                  <span>取消归档</span>
+                </el-button>
+                <el-button
+                  class="action-btn danger"
+                  :loading="busy"
+                  @click="onDelete"
+                >
+                  <Trash2 :size="16" :stroke-width="2" />
+                  <span>删除工单</span>
+                </el-button>
+              </div>
+            </div>
+          </SectionCard>
+
+          <!-- 关联信息（RAG 检索结果） -->
+          <SectionCard v-if="ticket.rag_result" title="知识库检索" icon="BookOpen" :padded="false">
+            <div class="content-pad">
+              <pre class="rag-content">{{ ticket.rag_result }}</pre>
+            </div>
+          </SectionCard>
         </div>
-        <el-empty v-else description="尚未答复" :image-size="80" />
-      </el-card>
-
-      <!-- 关闭信息 -->
-      <el-card v-if="ticket.status === 'closed' && ticket.close_reason" class="section-card closed-card" shadow="never">
-        <template #header>
-          <div class="section-header">
-            <span class="section-icon">🔒</span>
-            <span class="section-title">工单已关闭</span>
-          </div>
-        </template>
-        <div class="close-reason">{{ ticket.close_reason }}</div>
-      </el-card>
+      </div>
     </template>
-
-    <!-- 答复弹窗 -->
-    <el-dialog v-model="answerVisible" title="人工答复" :width="dialogWidth" class="answer-dialog" :destroy-on-close="true">
-      <el-form :model="answerForm" label-width="84px" label-position="right">
-        <el-form-item label="答复内容" required>
-          <el-input v-model="answerForm.answer" type="textarea" :rows="8" maxlength="5000" show-word-limit placeholder="请输入标准答案" />
-        </el-form-item>
-        <el-form-item label="答复人" required>
-          <el-input v-model="answerForm.operator" maxlength="64" placeholder="姓名或工号" />
-        </el-form-item>
-        <el-form-item label="同步知识库">
-          <el-switch v-model="answerForm.sync_to_kb" />
-          <span style="margin-left: 12px; color: var(--text-tertiary); font-size: 12px">（预留接口）</span>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="answerVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="doAnswer">提交答复</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getTicket, answerTicket, closeTicket } from '../api/ticket'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ChevronRight,
+  ChevronDown,
+  Clock,
+  MessageSquare,
+  MessageSquareCheck,
+  MessageSquareText,
+  HelpCircle,
+  Archive,
+  ArchiveRestore,
+  RotateCcw,
+  Trash2,
+  Pencil,
+  Plus,
+  Save,
+  Lock,
+} from '@lucide/vue'
+import {
+  getTicket,
+  answerTicket,
+  closeTicket,
+  reopenTicket,
+  archiveTicket,
+  deleteTicket,
+} from '../api/ticket'
+import SectionCard from '../components/common/SectionCard.vue'
+import StatusBadge from '../components/common/StatusBadge.vue'
+import CategoryBadge from '../components/common/CategoryBadge.vue'
+import ArchivedBadge from '../components/common/ArchivedBadge.vue'
+import EmptyState from '../components/common/EmptyState.vue'
+import DateTimeText from '../components/common/DateTimeText.vue'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(true)
 const ticket = ref(null)
-const answerVisible = ref(false)
-const submitting = ref(false)
+const busy = ref(false)
+const editingAnswer = ref(false)
+const answerDraft = ref('')
+const answerSubmitting = ref(false)
+const answerInputRef = ref(null)
 
-const isMobile = computed(() => window.innerWidth < 768)
-const dialogWidth = computed(() => isMobile.value ? '95vw' : '640px')
-
-const answerForm = reactive({
-  answer: '',
-  operator: '',
-  sync_to_kb: false,
-})
-
-const sourceLabel = (s) => ({
+const SOURCE_LABEL = {
   hiagent_chat: 'HiAgent 对话',
   wechat_service: '微信服务号',
   wechat_subscribe: '微信订阅号',
   feishu: '飞书',
   yiban: '易班',
-})[s] || s
-
-const statusLabel = (s) => ({
-  pending: '待处理',
-  processing: '处理中',
-  answered: '已回答',
-  closed: '已关闭',
-})[s] || s
-
-const formatTime = (iso) => {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 const fetch = async () => {
@@ -164,19 +317,38 @@ const fetch = async () => {
   }
 }
 
-const doAnswer = async () => {
-  if (!answerForm.answer.trim()) { ElMessage.warning('请填写答复内容'); return }
-  if (!answerForm.operator.trim()) { ElMessage.warning('请填写答复人'); return }
-  submitting.value = true
+const enterEditAnswer = async () => {
+  if (ticket.value?.status === 'closed') {
+    ElMessage.warning('工单已关闭，无法答复')
+    return
+  }
+  answerDraft.value = ticket.value?.answer || ''
+  editingAnswer.value = true
+  await nextTick()
+  if (answerInputRef.value?.focus) {
+    answerInputRef.value.focus()
+  }
+}
+
+const cancelEditAnswer = () => {
+  editingAnswer.value = false
+  answerDraft.value = ''
+}
+
+const saveAnswer = async () => {
+  const text = answerDraft.value.trim()
+  if (!text) {
+    ElMessage.warning('请填写答复内容')
+    return
+  }
+  answerSubmitting.value = true
   try {
-    await answerTicket(route.params.id, answerForm)
-    ElMessage.success('答复成功')
-    answerVisible.value = false
-    answerForm.answer = ''
-    answerForm.operator = ''
+    await answerTicket(route.params.id, { answer: text })
+    ElMessage.success('答复已保存')
+    editingAnswer.value = false
     await fetch()
   } catch (e) {} finally {
-    submitting.value = false
+    answerSubmitting.value = false
   }
 }
 
@@ -187,9 +359,56 @@ const onClose = () => {
     inputPlaceholder: '如：重复工单、无效问题等',
   })
     .then(async ({ value }) => {
-      await closeTicket(route.params.id, value || '')
-      ElMessage.success('工单已关闭')
-      await fetch()
+      busy.value = true
+      try {
+        await closeTicket(route.params.id, value || '')
+        ElMessage.success('工单已关闭')
+        await fetch()
+      } catch (e) {} finally { busy.value = false }
+    })
+    .catch(() => {})
+}
+
+const onReopen = async () => {
+  busy.value = true
+  try {
+    await reopenTicket(route.params.id)
+    ElMessage.success('工单已重开')
+    await fetch()
+  } catch (e) {} finally { busy.value = false }
+}
+
+const onArchive = async () => {
+  busy.value = true
+  try {
+    await archiveTicket(route.params.id, true)
+    ElMessage.success('工单已归档')
+    await fetch()
+  } catch (e) {} finally { busy.value = false }
+}
+
+const onUnarchive = async () => {
+  busy.value = true
+  try {
+    await archiveTicket(route.params.id, false)
+    ElMessage.success('已取消归档')
+    await fetch()
+  } catch (e) {} finally { busy.value = false }
+}
+
+const onDelete = () => {
+  ElMessageBox.confirm(
+    '确认删除该工单？软删后可在筛选中包含已删除查看。',
+    '删除工单',
+    { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+  )
+    .then(async () => {
+      busy.value = true
+      try {
+        await deleteTicket(route.params.id, false)
+        ElMessage.success('工单已删除')
+        router.push('/tickets')
+      } catch (e) {} finally { busy.value = false }
     })
     .catch(() => {})
 }
@@ -201,13 +420,13 @@ onMounted(fetch)
 .ticket-detail {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .breadcrumb {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 13px;
   color: var(--text-tertiary);
   margin-bottom: 4px;
@@ -219,181 +438,204 @@ onMounted(fetch)
 .crumb:hover { color: var(--color-primary); }
 .crumb.current { color: var(--text-primary); cursor: default; }
 .crumb.current:hover { color: var(--text-primary); }
-.sep { color: var(--text-tertiary); }
+.sep-icon { color: var(--text-tertiary); flex-shrink: 0; }
 
-/* 头部 */
-.header-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-.header-content {
+.header-pad { padding: 16px 20px; }
+
+.header-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
-}
-@media (max-width: 768px) {
-  .header-content { flex-direction: column; align-items: flex-start; gap: 12px; }
-}
-
-.ticket-id-large {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
 }
-.id-text {
+.header-left { flex: 1; min-width: 0; }
+.header-right {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ticket-id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ticket-id {
   font-family: 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 20px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  background: var(--bg-base);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  letter-spacing: -0.2px;
 }
-@media (max-width: 768px) { .id-text { font-size: 16px; } }
 
-.status-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot[data-status="pending"] { background: #fdcb6e; box-shadow: 0 0 0 3px rgba(253, 203, 110, 0.2); }
-.status-dot[data-status="processing"] { background: #74b9ff; box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.2); }
-.status-dot[data-status="answered"] { background: #00b894; box-shadow: 0 0 0 3px rgba(0, 184, 148, 0.2); }
-.status-dot[data-status="closed"] { background: #b2bec3; box-shadow: 0 0 0 3px rgba(178, 190, 195, 0.2); }
-
-.status-pill {
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-}
-.status-pill[data-status="pending"] { background: rgba(253, 203, 110, 0.15); color: #d68f00; }
-.status-pill[data-status="processing"] { background: rgba(116, 185, 255, 0.15); color: #0984e3; }
-.status-pill[data-status="answered"] { background: rgba(0, 184, 148, 0.15); color: #00b894; }
-.status-pill[data-status="closed"] { background: rgba(178, 190, 195, 0.15); color: #636e72; }
-
-.meta-row {
+.header-meta {
   display: flex;
-  gap: 20px;
-  margin-top: 12px;
+  gap: 16px;
+  margin-top: 10px;
   flex-wrap: wrap;
 }
-@media (max-width: 768px) { .meta-row { gap: 12px; } }
 .meta-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
 }
-@media (max-width: 768px) { .meta-item { font-size: 12px; } }
-.meta-item svg { width: 14px; height: 14px; opacity: 0.6; flex-shrink: 0; }
+.meta-item :first-child { color: var(--text-tertiary); }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-@media (max-width: 768px) { .header-actions { width: 100%; } }
-@media (max-width: 768px) { .header-actions .el-button { flex: 1; } }
-
-/* Section */
-.section-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-.section-card.closed-card { background: var(--bg-base); }
-.section-header {
-  display: flex;
+.header-tag {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.section-icon { font-size: 16px; }
-.section-title {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 15px;
-}
-.section-meta {
-  margin-left: auto;
+  gap: 4px;
   font-size: 12px;
-  color: var(--text-tertiary);
-  font-weight: normal;
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
 }
-@media (max-width: 768px) { .section-meta { margin-left: 0; width: 100%; } }
+.header-tag.warn {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.content-pad { padding: 20px; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 4fr);
+  gap: 16px;
+  align-items: start;
+}
+.detail-main, .detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (max-width: 1024px) {
+  .detail-grid { grid-template-columns: 1fr; }
+}
 
 .question-box {
   background: var(--gradient-soft);
   border-left: 3px solid var(--color-primary);
   padding: 16px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   white-space: pre-wrap;
   line-height: 1.7;
   color: var(--text-primary);
   font-size: 15px;
+  word-break: break-word;
 }
 @media (max-width: 768px) { .question-box { padding: 12px 14px; font-size: 14px; } }
 
-.rag-result {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--bg-base);
-  border-radius: 8px;
-  border: 1px solid var(--border-soft);
+.answer-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.rag-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-.rag-content {
-  font-size: 13px;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
-}
-.rag-empty {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--bg-base);
-  border-radius: 8px;
-  border: 1px dashed var(--border-color);
-  color: var(--text-tertiary);
-  font-size: 13px;
-  text-align: center;
-}
-
-.answer-box {
-  background: linear-gradient(135deg, #f0fbf8 0%, #e6f9f5 100%);
+.answer-text {
+  background: var(--color-primary-soft);
   border-left: 3px solid var(--color-primary);
-  padding: 20px 24px;
-  border-radius: 8px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
   white-space: pre-wrap;
   line-height: 1.8;
   color: var(--text-primary);
   font-size: 15px;
+  word-break: break-word;
 }
-html.dark .answer-box {
-  background: rgba(0, 184, 148, 0.08);
-  border-left-color: var(--color-primary);
+@media (max-width: 768px) { .answer-text { padding: 14px 16px; font-size: 14px; } }
+
+.answer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
-@media (max-width: 768px) { .answer-box { padding: 14px 16px; font-size: 14px; } }
+
+.answer-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 .close-reason {
   padding: 12px 16px;
   background: var(--bg-base);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.mono {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+.muted { color: var(--text-tertiary); }
+.archived-text { color: var(--text-secondary); }
+.danger-text {
+  color: var(--color-danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-desc :deep(.el-descriptions__label) {
+  color: var(--text-secondary);
+  width: 80px;
+  font-size: 12.5px;
+}
+
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.action-btn {
+  justify-content: flex-start;
+  width: 100%;
+  height: 38px;
+}
+.action-btn.danger {
+  color: var(--color-danger);
+  border-color: var(--border-color);
+  background: var(--bg-surface);
+}
+.action-btn.danger:hover {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.action-btn :deep(svg) { flex-shrink: 0; }
+
+.rag-content {
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
 }
 </style>
