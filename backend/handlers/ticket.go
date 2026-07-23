@@ -120,10 +120,7 @@ func (h *Handler) SubmitTicket(c *gin.Context) {
 		c.JSON(http.StatusOK, SubmitResponse{
 			TicketID: recent.TicketID,
 			Status:   "created",
-			Message: fmt.Sprintf(
-				"同学，这个问题已经记录过啦！工单号是 **%s**，正在处理中，请耐心等待~",
-				recent.TicketID,
-			),
+			Message:  fmt.Sprintf("已有工单（%s），请勿重复提交", recent.TicketID),
 		})
 		return
 	}
@@ -153,16 +150,7 @@ func (h *Handler) SubmitTicket(c *gin.Context) {
 	c.JSON(http.StatusOK, SubmitResponse{
 		TicketID: t.TicketID,
 		Status:   "created",
-		Message: fmt.Sprintf(
-			"同学你好！这个问题我目前还没有找到官方答案 😅\n\n"+
-				"我已经把你的问题记录下来（工单号：**%s**），"+
-				"学校相关部门会尽快补充信息。\n\n"+
-				"你也可以：\n"+
-				"1. 拨打 **招生办 0993-2092827**（工作日 9:00-12:00、15:00-18:00）直接咨询\n"+
-				"2. 登录 [迎新网](https://yx.shzu.edu.cn/) 查看最新通知\n\n"+
-				"等答案补充后，你再问我同样的问题就能答上来啦！",
-			t.TicketID,
-		),
+		Message:  fmt.Sprintf("工单已提交（%s），请等待答复", t.TicketID),
 	})
 }
 
@@ -304,7 +292,7 @@ func (h *Handler) AnswerTicket(c *gin.Context) {
 	c.JSON(http.StatusOK, AnswerResponse{
 		Success:  true,
 		TicketID: t.TicketID,
-		Message:  fmt.Sprintf("工单 %s 已成功答复，由 %s 处理。", t.TicketID, operatorName),
+		Message:  fmt.Sprintf("工单 %s 已答复", t.TicketID),
 	})
 }
 
@@ -343,7 +331,7 @@ func (h *Handler) CloseTicket(c *gin.Context) {
 	c.JSON(http.StatusOK, AnswerResponse{
 		Success:  true,
 		TicketID: t.TicketID,
-		Message:  fmt.Sprintf("工单 %s 已关闭。", t.TicketID),
+		Message:  fmt.Sprintf("工单 %s 已关闭", t.TicketID),
 	})
 }
 
