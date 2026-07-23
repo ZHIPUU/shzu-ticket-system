@@ -1,0 +1,19 @@
+# 工单系统 CLI 配置示例
+# 复制到 ~/.ticket-cli.yaml 后修改
+
+# 后端 API 地址
+api_base: http://120.48.98.164:8080/api/v1
+
+# 智能体 API Key（用于 ticket submit）
+api_key: sk-ticket-prod-shzu-2026
+
+# 管理员登录凭据（用于 ticket login）
+username: admin
+password: admin123
+
+# 登录后自动填充（不要手动改）
+# token: eyJhbGciOiJIUzI1NiIs...
+# token_expires_at: 2026-07-24T06:43:47Z
+
+# 默认输出格式：table | json | pretty
+output_format: table
