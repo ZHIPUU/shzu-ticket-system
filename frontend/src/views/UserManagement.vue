@@ -1,70 +1,76 @@
 <template>
   <div class="user-mgmt">
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">用户管理</h1>
-        <p class="page-desc">管理系统用户、角色和权限</p>
-      </div>
-      <el-button type="primary" @click="openCreate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        新建用户
-      </el-button>
-    </header>
+    <PageHeader title="用户管理" description="管理系统用户、角色和权限">
+      <template #actions>
+        <el-button type="primary" @click="openCreate">
+          <Plus :size="16" :stroke-width="2.4" />
+          <span>新建用户</span>
+        </el-button>
+      </template>
+    </PageHeader>
 
-    <el-card shadow="never" class="user-card">
+    <SectionCard :padded="false">
       <div class="table-wrapper">
-      <el-table :data="users" v-loading="loading" stripe>
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="username" label="用户名" width="140" />
-        <el-table-column label="显示名" width="140">
-          <template #default="{ row }">{{ row.display_name || '—' }}</template>
-        </el-table-column>
-        <el-table-column prop="email" label="邮箱" min-width="180">
-          <template #default="{ row }">{{ row.email || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="角色" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" size="small">
-              {{ row.role === 'admin' ? '管理员' : '工作人员' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.active ? 'success' : 'warning'" size="small">
-              {{ row.active ? '启用' : '已禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="需改密码" width="100">
-          <template #default="{ row }">
-            <span v-if="row.must_change_password" style="color: #e17055">⚠ 是</span>
-            <span v-else style="color: var(--text-tertiary)">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="last_login_at" label="最后登录" width="160">
-          <template #default="{ row }">{{ row.last_login_at ? formatTime(row.last_login_at) : '从未' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" link type="warning" @click="onResetPwd(row)">重置密码</el-button>
-            <el-button
-              size="small"
-              link
-              :type="row.active ? 'danger' : 'success'"
-              :disabled="row.id === currentUserId"
-              @click="onToggleActive(row)"
-            >
-              {{ row.active ? '禁用' : '启用' }}
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <el-table :data="users" v-loading="loading" stripe>
+          <el-table-column prop="id" label="ID" width="60" />
+          <el-table-column prop="username" label="用户名" width="140" />
+          <el-table-column label="显示名" width="140">
+            <template #default="{ row }">{{ row.display_name || '—' }}</template>
+          </el-table-column>
+          <el-table-column prop="email" label="邮箱" min-width="180">
+            <template #default="{ row }">{{ row.email || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="角色" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" size="small">
+                {{ row.role === 'admin' ? '管理员' : '工作人员' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.active ? 'success' : 'warning'" size="small">
+                {{ row.active ? '启用' : '已禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="需改密码" width="100">
+            <template #default="{ row }">
+              <span v-if="row.must_change_password" class="warn-text">⚠ 是</span>
+              <span v-else class="muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="最后登录" width="160">
+            <template #default="{ row }">
+              <DateTimeText v-if="row.last_login_at" :value="row.last_login_at" mode="datetime" />
+              <span v-else class="muted">从未</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="240" fixed="right">
+            <template #default="{ row }">
+              <el-button size="small" link type="primary" @click="openEdit(row)">
+                <Pencil :size="14" :stroke-width="2" />
+                <span style="margin-left: 4px">编辑</span>
+              </el-button>
+              <el-button size="small" link type="warning" @click="onResetPwd(row)">
+                <KeyRound :size="14" :stroke-width="2" />
+                <span style="margin-left: 4px">重置密码</span>
+              </el-button>
+              <el-button
+                size="small"
+                link
+                :type="row.active ? 'danger' : 'success'"
+                :disabled="row.id === currentUserId"
+                @click="onToggleActive(row)"
+              >
+                <component :is="row.active ? Ban : CheckCircle" :size="14" :stroke-width="2" />
+                <span style="margin-left: 4px">{{ row.active ? '禁用' : '启用' }}</span>
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
-    </el-card>
+    </SectionCard>
 
     <!-- 新建用户 -->
     <el-dialog v-model="createVisible" title="新建用户" :width="dialogWidth" :destroy-on-close="true">
@@ -134,8 +140,12 @@
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Pencil, KeyRound, Ban, CheckCircle } from '@lucide/vue'
 import { listUsers, createUser, updateUser } from '../api/auth'
 import { useUserStore } from '../stores/user'
+import PageHeader from '../components/common/PageHeader.vue'
+import SectionCard from '../components/common/SectionCard.vue'
+import DateTimeText from '../components/common/DateTimeText.vue'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
@@ -164,13 +174,6 @@ const createRules = {
   password: [{ required: true, min: 8, message: '至少 8 位', trigger: 'blur' }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
-}
-
-const formatTime = (iso) => {
-  if (!iso) return ''
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 const fetch = async () => {
@@ -261,11 +264,7 @@ const onToggleActive = async (row) => {
     await updateUser(row.id, { active: !row.active })
     ElMessage.success(`已${action}`)
     await fetch()
-  } catch (e) {
-    if (e !== 'cancel') {
-      // 错误已拦截
-    }
-  }
+  } catch (e) {}
 }
 
 onMounted(fetch)
@@ -275,39 +274,14 @@ onMounted(fetch)
 .user-mgmt {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 4px;
-  letter-spacing: -0.5px;
-}
-.page-desc {
-  color: var(--text-secondary);
-  margin: 0;
-  font-size: 13px;
-}
-
-.user-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 768px) {
-  .page-title { font-size: 18px; }
-}
+.muted { color: var(--text-tertiary); }
+.warn-text { color: var(--color-warning); }
 </style>

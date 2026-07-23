@@ -7,11 +7,7 @@
     <aside class="sidebar" :class="{ collapsed: sidebarCollapsed, mobileOpen }">
       <div class="brand" @click="$router.push('/tickets')">
         <div class="brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 7l9-4 9 4-9 4-9-4z" />
-            <path d="M3 12l9 4 9-4" />
-            <path d="M3 17l9 4 9-4" />
-          </svg>
+          <TicketsPlane :size="20" :stroke-width="2" />
         </div>
         <transition name="fade">
           <div v-show="!sidebarCollapsed" class="brand-text">
@@ -32,7 +28,7 @@
           :title="sidebarCollapsed ? item.label : ''"
           @click="mobileOpen = false"
         >
-          <span class="menu-icon" v-html="item.icon" />
+          <component :is="item.icon" :size="18" :stroke-width="2" class="menu-icon" />
           <transition name="fade">
             <span v-show="!sidebarCollapsed" class="menu-label">{{ item.label }}</span>
           </transition>
@@ -49,18 +45,10 @@
 
       <div class="sidebar-footer">
         <button class="collapse-btn" @click="toggleSidebar" :title="sidebarCollapsed ? '展开' : '收起'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path :d="sidebarCollapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
-          </svg>
+          <component :is="sidebarCollapsed ? ChevronsRight : ChevronsLeft" :size="16" :stroke-width="2" />
         </button>
         <button class="theme-toggle" @click="toggleTheme" :title="isDark ? '切换到亮色' : '切换到暗色'">
-          <svg v-if="isDark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
+          <component :is="isDark ? Sun : Moon" :size="16" :stroke-width="2" />
         </button>
       </div>
     </aside>
@@ -70,9 +58,7 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="hamburger" @click="mobileOpen = true" aria-label="打开菜单">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 12h18M3 6h18M3 18h18" />
-            </svg>
+            <Menu :size="22" :stroke-width="2" />
           </button>
           <h2 class="page-title">{{ pageTitle }}</h2>
         </div>
@@ -86,24 +72,17 @@
                 <div class="user-name">{{ userStore.user?.display_name || userStore.user?.username }}</div>
                 <div class="user-role">{{ userStore.user?.role === 'admin' ? '管理员' : '工作人员' }}</div>
               </div>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;opacity:0.6">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
+              <ChevronDown :size="14" :stroke-width="2" class="chev" />
             </div>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="settings">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:8px;vertical-align:middle">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                  </svg>
+                  <Settings :size="14" :stroke-width="2" class="drop-icon" />
                   个人设置
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
-                  <span style="color: #d63031">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:8px;vertical-align:middle">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-                    </svg>
+                  <span class="logout-text">
+                    <LogOut :size="14" :stroke-width="2" class="drop-icon" />
                     退出登录
                   </span>
                 </el-dropdown-item>
@@ -128,6 +107,18 @@
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import {
+  TicketsPlane,
+  Users,
+  Settings,
+  Menu,
+  Sun,
+  Moon,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronDown,
+  LogOut,
+} from '@lucide/vue'
 import { useTheme } from '../composables/useTheme'
 import { useUserStore } from '../stores/user'
 import { listTickets } from '../api/ticket'
@@ -149,23 +140,9 @@ onMounted(() => {
 onUnmounted(() => window.removeEventListener('resize', checkMobile))
 
 const menuItems = ref([
-  {
-    path: '/tickets',
-    label: '工单列表',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3zM3 11h18v4H3zM3 19h18v2H3z"/></svg>',
-    badge: 0,
-  },
-  {
-    path: '/users',
-    label: '用户管理',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    adminOnly: true,
-  },
-  {
-    path: '/settings',
-    label: '个人设置',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
-  },
+  { path: '/tickets', label: '工单列表', icon: TicketsPlane, badge: 0 },
+  { path: '/users', label: '用户管理', icon: Users, adminOnly: true },
+  { path: '/settings', label: '个人设置', icon: Settings },
 ])
 
 const pageTitle = computed(() => {
@@ -247,7 +224,7 @@ const refreshBadges = async () => {
   position: relative;
   z-index: 10;
 }
-.sidebar.collapsed { width: 72px; }
+.sidebar.collapsed { width: 68px; }
 
 @media (max-width: 768px) {
   .sidebar {
@@ -269,32 +246,32 @@ const refreshBadges = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 20px;
+  padding: 0 20px;
   cursor: pointer;
   user-select: none;
   border-bottom: 1px solid var(--border-soft);
   height: var(--header-height);
+  flex-shrink: 0;
 }
 .brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
   background: var(--gradient-header);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 184, 148, 0.3);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
-.brand-icon svg { width: 20px; height: 20px; }
 .brand-text { line-height: 1.3; }
 .brand-name { font-weight: 600; font-size: 15px; color: var(--text-primary); }
 .brand-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
 
 .menu {
   flex: 1;
-  padding: 16px 12px;
+  padding: 12px 12px;
   overflow-y: auto;
 }
 .menu-section {
@@ -311,7 +288,7 @@ const refreshBadges = async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   text-decoration: none;
@@ -337,28 +314,27 @@ const refreshBadges = async () => {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 20px;
+  height: 18px;
   background: var(--color-primary);
   border-radius: 0 2px 2px 0;
 }
-.menu-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.menu-icon :deep(svg) { width: 18px; height: 18px; }
+.menu-icon { flex-shrink: 0; }
 .menu-label { flex: 1; }
 .menu-badge { margin-left: auto; }
 
 .sidebar-footer {
   border-top: 1px solid var(--border-soft);
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .collapse-btn {
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  border-radius: var(--radius-md);
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -371,14 +347,13 @@ const refreshBadges = async () => {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
-.collapse-btn svg { width: 16px; height: 16px; }
 
 .theme-toggle {
   background: var(--bg-hover);
   border: 1px solid var(--border-color);
-  border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  border-radius: var(--radius-md);
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -390,9 +365,7 @@ const refreshBadges = async () => {
 .theme-toggle:hover {
   background: var(--color-primary-soft);
   color: var(--color-primary);
-  transform: rotate(20deg);
 }
-.theme-toggle svg { width: 16px; height: 16px; }
 
 /* ─── 主内容 ─── */
 .main {
@@ -401,6 +374,7 @@ const refreshBadges = async () => {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-base);
+  min-width: 0;
 }
 
 .topbar {
@@ -410,7 +384,7 @@ const refreshBadges = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32px;
+  padding: 0 24px;
   flex-shrink: 0;
 }
 @media (max-width: 768px) { .topbar { padding: 0 16px; } }
@@ -428,18 +402,17 @@ const refreshBadges = async () => {
   color: var(--text-secondary);
   cursor: pointer;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .hamburger:hover { color: var(--text-primary); background: var(--bg-hover); }
-.hamburger svg { width: 22px; height: 22px; }
 @media (max-width: 768px) { .hamburger { display: flex; align-items: center; justify-content: center; } }
 
 .page-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.2px;
 }
 @media (max-width: 768px) { .page-title { font-size: 14px; } }
 
@@ -447,8 +420,8 @@ const refreshBadges = async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px 6px 6px;
-  border-radius: 999px;
+  padding: 5px 10px 5px 5px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background var(--transition-fast);
   user-select: none;
@@ -457,8 +430,8 @@ const refreshBadges = async () => {
 @media (max-width: 768px) { .user-chip { padding: 4px; } }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--color-primary);
   color: #fff;
@@ -466,13 +439,13 @@ const refreshBadges = async () => {
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 13px;
-  box-shadow: 0 2px 6px rgba(0, 184, 148, 0.3);
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
   flex-shrink: 0;
 }
 .avatar[data-role="admin"] {
-  background: linear-gradient(135deg, #d63031 0%, #e17055 100%);
-  box-shadow: 0 2px 6px rgba(214, 48, 49, 0.3);
+  background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
 }
 .user-info { line-height: 1.2; }
 @media (max-width: 768px) { .user-info { display: none; } }
@@ -486,11 +459,14 @@ const refreshBadges = async () => {
   color: var(--text-tertiary);
   margin-top: 1px;
 }
+.chev { color: var(--text-tertiary); flex-shrink: 0; }
+.drop-icon { margin-right: 8px; vertical-align: middle; }
+.logout-text { color: var(--color-danger); display: inline-flex; align-items: center; }
 
 .page-container {
   flex: 1;
   overflow: auto;
-  padding: 32px;
+  padding: 24px;
 }
 @media (max-width: 768px) { .page-container { padding: 16px; } }
 </style>

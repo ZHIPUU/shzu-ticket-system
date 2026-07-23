@@ -9,11 +9,7 @@
     <div class="login-container">
       <div class="brand-area">
         <div class="logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 7l9-4 9 4-9 4-9-4z" />
-            <path d="M3 12l9 4 9-4" />
-            <path d="M3 17l9 4 9-4" />
-          </svg>
+          <TicketsPlane :size="32" :stroke-width="2" />
         </div>
         <h1 class="brand-name">石小易工单</h1>
         <p class="brand-sub">迎新智能体后台管理系统</p>
@@ -57,6 +53,7 @@ import { ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
+import { TicketsPlane } from '@lucide/vue'
 import { useUserStore } from '../stores/user'
 import { useTheme } from '../composables/useTheme'
 
@@ -88,7 +85,6 @@ const onSubmit = async () => {
       const r = await userStore.login(form.username, form.password)
       ElMessage.success(`欢迎回来，${r.user.display_name || r.user.username}`)
       const redirect = route.query.redirect || '/tickets'
-      // 强制改密码时先跳设置
       if (r.must_change_password) {
         router.push('/settings')
       } else {
@@ -111,11 +107,11 @@ const onSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f0fbf8 0%, #e6f9f5 50%, #f7f9fc 100%);
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #F5F7FA 100%);
   overflow: hidden;
 }
 html.dark .login-page {
-  background: linear-gradient(135deg, #0a1413 0%, #0f1115 50%, #142826 100%);
+  background: linear-gradient(135deg, #0B0F19 0%, #0F1A2D 50%, #131E33 100%);
 }
 
 .login-bg {
@@ -132,9 +128,9 @@ html.dark .login-page {
   opacity: 0.5;
   animation: float 20s ease-in-out infinite;
 }
-.blob-1 { width: 480px; height: 480px; background: #00b894; top: -100px; left: -100px; }
-.blob-2 { width: 380px; height: 380px; background: #00cec9; bottom: -80px; right: -80px; animation-delay: -7s; }
-.blob-3 { width: 320px; height: 320px; background: #74b9ff; top: 40%; left: 50%; animation-delay: -14s; opacity: 0.3; }
+.blob-1 { width: 480px; height: 480px; background: #2563EB; top: -100px; left: -100px; }
+.blob-2 { width: 380px; height: 380px; background: #3B82F6; bottom: -80px; right: -80px; animation-delay: -7s; }
+.blob-3 { width: 320px; height: 320px; background: #60A5FA; top: 40%; left: 50%; animation-delay: -14s; opacity: 0.3; }
 @media (max-width: 768px) {
   .blob-1 { width: 260px; height: 260px; top: -60px; left: -60px; }
   .blob-2 { width: 200px; height: 200px; bottom: -40px; right: -40px; }
@@ -167,14 +163,13 @@ html.dark .login-page {
   height: 64px;
   margin: 0 auto 16px;
   background: var(--gradient-header);
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 8px 24px rgba(0, 184, 148, 0.3);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
 }
-.logo svg { width: 32px; height: 32px; }
 .brand-name {
   font-size: 24px;
   font-weight: 600;
@@ -222,12 +217,12 @@ html.dark .login-card {
   font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(0, 184, 148, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   transition: all var(--transition-base);
 }
 .submit-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(0, 184, 148, 0.35);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
   background: var(--gradient-header) !important;
 }
 
@@ -235,7 +230,7 @@ html.dark .login-card {
   margin-top: 20px;
   padding: 12px 14px;
   background: var(--bg-base);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px dashed var(--border-color);
   font-size: 12px;
   color: var(--text-tertiary);
