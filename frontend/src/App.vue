@@ -1,14 +1,10 @@
 <template>
   <router-view />
+  <ToastHost />
+  <ConfirmHost />
 </template>
 
 <script setup>
+import ToastHost from './ui/ToastHost.vue'
+import ConfirmHost from './ui/ConfirmHost.vue'
 </script>
-
-<style>
-html, body, #app {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-</style>

@@ -1,280 +1,305 @@
 <template>
   <div class="ticket-list">
-    <PageHeader title="工单列表" description="管理用户提问工单 · 答复 · 归档 · 导出">
-      <template #actions>
-        <el-button @click="openExport">
-          <Download :size="16" :stroke-width="2" />
-          <span class="btn-label">导出</span>
-        </el-button>
-        <el-button type="primary" @click="openCreate">
-          <Plus :size="16" :stroke-width="2.4" />
-          <span>模拟提交</span>
-        </el-button>
-      </template>
-    </PageHeader>
+    <!-- ═══ 页头 ═══ -->
+    <header class="list-head anim-fade-up">
+      <div class="head-text">
+        <h1>工单列表</h1>
+        <p>管理用户提问工单 · 答复 · 归档 · 导出</p>
+      </div>
+      <div class="head-actions">
+        <UiButton variant="ghost" :icon-only="isMobile" @click="openExport">
+          <template #icon><Download :size="16" :stroke-width="2" /></template>
+          <span v-if="!isMobile">导出</span>
+        </UiButton>
+        <UiButton variant="primary" :icon-only="isMobile" @click="openCreate">
+          <template #icon><Plus :size="16" :stroke-width="2.4" /></template>
+          <span v-if="!isMobile">模拟提交</span>
+        </UiButton>
+      </div>
+    </header>
 
-    <!-- 统计卡片 -->
-    <div class="stats-row">
-      <StatCard
-        icon="Inbox"
-        label="当前页工单数"
-        :value="rows.length"
-        meta="当前筛选下"
-        accent="#2563EB"
-      />
-      <StatCard
-        icon="Clock"
-        label="待处理"
-        :value="counts.pending"
-        meta="需尽快响应"
-        accent="#F59E0B"
-      />
-      <StatCard
-        icon="MessageSquareCheck"
-        label="已答复"
-        :value="counts.answered"
-        meta="等待复问"
-        accent="#10B981"
-      />
-      <StatCard
-        icon="Database"
-        label="总工单数"
-        :value="total"
-        meta="全部数据"
-        accent="#8B5CF6"
-      />
+    <!-- ═══ 统计 ═══ -->
+    <div class="stats-grid">
+      <StatCard v-for="(s, i) in statItems" :key="s.label" v-bind="s" class="anim-stagger" :style="{ '--i': i }" />
     </div>
 
-    <!-- 筛选 -->
-    <SectionCard :padded="false">
-      <div class="filter-pad">
-        <div class="filter-header" @click="filterExpanded = !filterExpanded">
-          <div class="filter-title">
-            <SlidersHorizontal :size="14" :stroke-width="2" />
-            <span>筛选条件</span>
-          </div>
-          <ChevronDown :size="16" :stroke-width="2" :class="{ rotated: filterExpanded }" class="chev" />
-        </div>
-        <div class="filter-body" :class="{ expanded: filterExpanded }">
-          <el-form inline :model="filters" @submit.prevent>
-            <el-form-item label="状态">
-              <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 130px" @change="reload">
-                <el-option label="待处理" value="pending" />
-                <el-option label="处理中" value="processing" />
-                <el-option label="已答复" value="answered" />
-                <el-option label="已关闭" value="closed" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="归档">
-              <el-select v-model="filters.archived" placeholder="全部" clearable style="width: 120px" @change="reload">
-                <el-option label="未归档" value="false" />
-                <el-option label="已归档" value="true" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="分类">
-              <el-input v-model="filters.category" placeholder="如：宿舍/招办" clearable style="width: 140px" @keyup.enter="reload" @clear="reload" />
-            </el-form-item>
-            <el-form-item label="搜索">
-              <el-input v-model="filters.q" placeholder="工单号 / 问题关键字" clearable style="width: 200px" @keyup.enter="reload" @clear="reload">
-                <template #prefix><Search :size="14" :stroke-width="2" /></template>
-              </el-input>
-            </el-form-item>
-            <el-form-item label="时间">
-              <el-date-picker
-                v-model="dateRange"
-                type="daterange"
-                value-format="YYYY-MM-DD"
-                start-placeholder="开始"
-                end-placeholder="结束"
-                range-separator="至"
-                @change="onDateChange"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button @click="reset" plain>
-                <RotateCcw :size="14" :stroke-width="2" />
-                <span style="margin-left: 4px">重置</span>
-              </el-button>
-            </el-form-item>
-          </el-form>
+    <!-- ═══ 工具栏 ═══ -->
+    <div class="toolbar card anim-stagger" style="--i: 4">
+      <div class="toolbar-main">
+        <UiSegmented v-model="filters.status" :options="statusOptions" @change="onFilterChange" />
+        <div class="toolbar-right">
+          <UiInput
+            v-model="filters.q"
+            class="search-input"
+            placeholder="工单号 / 问题关键字"
+            clearable
+            @enter="onFilterChange"
+            @clear="onFilterChange"
+            @update:model-value="onSearchInput"
+          >
+            <template #prefix><Search :size="15" :stroke-width="2" /></template>
+          </UiInput>
+          <UiButton
+            variant="ghost"
+            :icon-only="isMobile"
+            :class="{ 'filter-on': filterOpen || hasAdvFilter }"
+            @click="filterOpen = !filterOpen"
+          >
+            <template #icon><Funnel :size="15" :stroke-width="2" /></template>
+            <span v-if="!isMobile">筛选</span>
+          </UiButton>
+          <UiButton v-if="isMobile" variant="ghost" icon-only @click="toggleSelectMode">
+            <template #icon>
+              <SquareCheckBig v-if="!selectMode" :size="15" :stroke-width="2" />
+              <X v-else :size="15" :stroke-width="2" />
+            </template>
+          </UiButton>
         </div>
       </div>
-    </SectionCard>
 
-    <!-- 表格卡片 -->
-    <SectionCard :padded="false">
-      <!-- 多选时顶部操作条 -->
-      <transition name="slide-down">
-        <div v-if="selected.length > 0" class="bulk-bar">
-          <div class="bulk-info">
-            <CheckSquare :size="16" :stroke-width="2" class="bulk-icon" />
-            <span>已选 <strong>{{ selected.length }}</strong> 项</span>
-            <el-button link size="small" @click="clearSelection">取消选择</el-button>
+      <!-- 高级筛选（可折叠） -->
+      <div class="adv-wrap" :class="{ open: filterOpen }">
+        <div class="adv-inner">
+          <div class="adv-field">
+            <label>归档状态</label>
+            <UiSelect v-model="filters.archived" :options="archivedOptions" @change="onFilterChange" />
           </div>
-          <div class="bulk-actions">
-            <el-button size="small" @click="onBulkArchive(true)">
-              <Archive :size="14" :stroke-width="2" />
-              <span>归档</span>
-            </el-button>
-            <el-button size="small" @click="onBulkArchive(false)">
-              <ArchiveRestore :size="14" :stroke-width="2" />
-              <span>取消归档</span>
-            </el-button>
-            <el-button size="small" type="danger" @click="onBulkDelete">
-              <Trash2 :size="14" :stroke-width="2" />
-              <span>删除</span>
-            </el-button>
+          <div class="adv-field">
+            <label>分类</label>
+            <UiInput v-model="filters.category" placeholder="如：宿舍 / 招办" clearable @enter="onFilterChange" @clear="onFilterChange" />
+          </div>
+          <div class="adv-field">
+            <label>开始日期</label>
+            <UiInput v-model="filters.startDate" type="date" @update:model-value="onFilterChange" />
+          </div>
+          <div class="adv-field">
+            <label>结束日期</label>
+            <UiInput v-model="filters.endDate" type="date" @update:model-value="onFilterChange" />
+          </div>
+          <div class="adv-field adv-actions">
+            <UiButton variant="ghost" size="sm" @click="reset">
+              <template #icon><RotateCcw :size="13" :stroke-width="2" /></template>
+              重置全部
+            </UiButton>
           </div>
         </div>
-      </transition>
+      </div>
+    </div>
 
-      <div class="table-wrapper">
-        <el-table
-          :data="rows"
-          v-loading="loading"
-          stripe
-          class="ticket-table"
-          :empty-text="loading ? '加载中...' : '暂无工单'"
-          @selection-change="onSelectionChange"
+    <!-- ═══ 列表 ═══ -->
+    <div class="list-card card anim-stagger" style="--i: 5">
+      <!-- 加载骨架 -->
+      <div v-if="loading" class="list-loading"><UiSkeleton type="rows" :count="6" /></div>
+
+      <!-- 空态 -->
+      <UiEmpty
+        v-else-if="!rows.length"
+        icon="Inbox"
+        title="暂无工单"
+        :description="hasAnyFilter ? '当前筛选条件下没有工单，试试调整筛选' : '还没有用户提交工单'"
+      >
+        <UiButton v-if="hasAnyFilter" variant="ghost" size="sm" @click="reset">清除筛选条件</UiButton>
+      </UiEmpty>
+
+      <!-- 桌面端表格 -->
+      <template v-else-if="!isMobile">
+        <div class="t-head">
+          <div class="t-cell c-check">
+            <UiCheckbox :model-value="allSelected" :indeterminate="partialSelected" @update:model-value="toggleAll" />
+          </div>
+          <div class="t-cell c-id">工单号</div>
+          <div class="t-cell c-q">用户问题</div>
+          <div class="t-cell c-status">状态</div>
+          <div class="t-cell c-cat">分类</div>
+          <div class="t-cell c-time">创建时间</div>
+          <div class="t-cell c-arrow" />
+        </div>
+        <div
+          v-for="(row, i) in rows"
+          :key="row.ticket_id"
+          class="t-row anim-stagger"
+          :style="{ '--i': i }"
+          :class="{ selected: isSelected(row.ticket_id) }"
+          @click="goDetail(row.ticket_id)"
         >
-          <el-table-column type="selection" width="44" />
-          <el-table-column prop="ticket_id" label="工单号" width="170">
-            <template #default="{ row }">
-              <span class="ticket-id" @click="$router.push(`/tickets/${row.ticket_id}`)">
-                {{ row.ticket_id }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="question" label="用户问题" show-overflow-tooltip min-width="240">
-            <template #default="{ row }">
-              <div class="question-cell">{{ row.question }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="90">
-            <template #default="{ row }">
-              <StatusBadge :status="row.status" />
-            </template>
-          </el-table-column>
-          <el-table-column label="分类" width="100">
-            <template #default="{ row }">
-              <CategoryBadge :category="row.category" />
-            </template>
-          </el-table-column>
-          <el-table-column label="归档" width="70" align="center">
-            <template #default="{ row }">
-              <span v-if="row.archived" class="archived-tag">
-                <Archive :size="12" :stroke-width="2.4" />
-              </span>
-              <span v-else class="muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="创建时间" width="155">
-            <template #default="{ row }">
-              <DateTimeText :value="row.created_at" mode="datetime" />
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right" align="center">
-            <template #default="{ row }">
-              <el-button size="small" link type="primary" @click="$router.push(`/tickets/${row.ticket_id}`)">
-                查看
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
+          <div class="t-cell c-check" @click.stop>
+            <UiCheckbox :model-value="isSelected(row.ticket_id)" @update:model-value="toggleOne(row.ticket_id)" />
+          </div>
+          <div class="t-cell c-id">
+            <span class="tid mono">{{ row.ticket_id }}</span>
+          </div>
+          <div class="t-cell c-q">
+            <span class="q-text clamp-2">{{ row.question }}</span>
+          </div>
+          <div class="t-cell c-status">
+            <StatusPill :status="row.status" />
+            <span v-if="row.archived" class="archived-mark" title="已归档"><Archive :size="13" :stroke-width="2.2" /></span>
+          </div>
+          <div class="t-cell c-cat"><CategoryTag :category="row.category" /></div>
+          <div class="t-cell c-time"><TimeText :value="row.created_at" /></div>
+          <div class="t-cell c-arrow"><ChevronRight :size="15" :stroke-width="2" /></div>
+        </div>
+      </template>
 
-      <div class="pagination-wrap">
-        <el-pagination
-          v-model:current-page="filters.page"
+      <!-- 移动端卡片 -->
+      <template v-else>
+        <div
+          v-for="(row, i) in rows"
+          :key="row.ticket_id"
+          class="m-card anim-stagger"
+          :style="{ '--i': i }"
+          :class="{ selected: isSelected(row.ticket_id), 'select-mode': selectMode }"
+          @click="onCardTap(row.ticket_id)"
+        >
+          <div v-if="selectMode" class="m-check" @click.stop="toggleOne(row.ticket_id)">
+            <UiCheckbox :model-value="isSelected(row.ticket_id)" />
+          </div>
+          <div class="m-body">
+            <div class="m-top">
+              <StatusPill :status="row.status" />
+              <span v-if="row.archived" class="archived-mark"><Archive :size="12" :stroke-width="2.2" />已归档</span>
+              <TimeText :value="row.created_at" mode="relative" class="m-time" />
+            </div>
+            <div class="m-q clamp-2">{{ row.question }}</div>
+            <div class="m-bottom">
+              <span class="tid mono">{{ row.ticket_id }}</span>
+              <CategoryTag :category="row.category" />
+              <ChevronRight v-if="!selectMode" :size="15" :stroke-width="2" class="m-chev" />
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 分页 -->
+      <div v-if="!loading && rows.length" class="list-pager">
+        <UiPagination
+          v-model:page="filters.page"
           v-model:page-size="filters.page_size"
           :total="total"
-          :page-sizes="[10, 20, 50, 100]"
-          :layout="paginationLayout"
-          @current-change="reload"
-          @size-change="reload"
+          :compact="isMobile"
+          @change="reload"
         />
       </div>
-    </SectionCard>
+    </div>
 
-    <!-- 模拟提交对话框 -->
-    <el-dialog v-model="createVisible" title="模拟智能体提交工单" :width="dialogWidth" class="create-dialog" :destroy-on-close="true">
-      <el-form :model="createForm" label-width="80px" label-position="right">
-        <el-form-item label="问题" required>
-          <el-input v-model="createForm.question" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="例如：石河子大学2026年计算机学院宿舍分配在哪？" />
-        </el-form-item>
-        <el-form-item label="用户 ID" required>
-          <el-input v-model="createForm.user_id" maxlength="128" placeholder="HiAgent 平台 session_id" />
-        </el-form-item>
-        <el-form-item label="RAG 结果">
-          <el-input v-model="createForm.rag_result" type="textarea" :rows="2" placeholder="留空表示完全无结果" />
-        </el-form-item>
-      </el-form>
+    <!-- ═══ 浮动批量操作条 ═══ -->
+    <Transition name="rise">
+      <div v-if="selected.length > 0" class="bulk-bar card">
+        <span class="bulk-count">已选 <strong class="tnum">{{ selected.length }}</strong> 项</span>
+        <span class="bulk-divider" />
+        <UiButton variant="text" size="sm" @click="onBulkArchive(true)">
+          <template #icon><Archive :size="14" :stroke-width="2" /></template>
+          归档
+        </UiButton>
+        <UiButton variant="text" size="sm" @click="onBulkArchive(false)">
+          <template #icon><ArchiveRestore :size="14" :stroke-width="2" /></template>
+          取消归档
+        </UiButton>
+        <UiButton variant="text" size="sm" class="bulk-danger" @click="onBulkDelete">
+          <template #icon><Trash2 :size="14" :stroke-width="2" /></template>
+          删除
+        </UiButton>
+        <span class="bulk-divider" />
+        <button class="bulk-close" aria-label="退出批量操作" @click="exitBulk">
+          <X :size="15" :stroke-width="2.2" />
+        </button>
+      </div>
+    </Transition>
+
+    <!-- ═══ 模拟提交 ═══ -->
+    <UiModal v-model="createVisible" title="模拟智能体提交工单" width="540px">
+      <div class="form-stack">
+        <div class="form-item">
+          <label class="form-label">问题 <em>*</em></label>
+          <UiInput
+            v-model="createForm.question"
+            type="textarea"
+            :rows="3"
+            :maxlength="500"
+            show-word-limit
+            placeholder="例如：石河子大学2026年计算机学院宿舍分配在哪？"
+          />
+        </div>
+        <div class="form-item">
+          <label class="form-label">用户 ID <em>*</em></label>
+          <UiInput v-model="createForm.user_id" :maxlength="128" placeholder="HiAgent 平台 session_id" />
+        </div>
+        <div class="form-item">
+          <label class="form-label">RAG 结果</label>
+          <UiInput v-model="createForm.rag_result" type="textarea" :rows="2" placeholder="留空表示完全无结果" />
+        </div>
+      </div>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" @click="doCreate">提交</el-button>
+        <UiButton variant="ghost" @click="createVisible = false">取消</UiButton>
+        <UiButton variant="primary" :loading="creating" @click="doCreate">提交</UiButton>
       </template>
-    </el-dialog>
+    </UiModal>
 
-    <!-- 导出对话框 -->
-    <el-dialog v-model="exportVisible" title="导出工单" :width="dialogWidth" :destroy-on-close="true">
-      <el-form label-width="80px" label-position="right">
-        <el-form-item label="格式">
-          <el-radio-group v-model="exportFormat">
-            <el-radio-button label="csv">CSV</el-radio-button>
-            <el-radio-button label="json">JSON</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-alert type="info" :closable="false" show-icon style="margin: 8px 0">
-          <template #title>说明</template>
+    <!-- ═══ 导出 ═══ -->
+    <UiModal v-model="exportVisible" title="导出工单" width="440px">
+      <div class="form-stack">
+        <div class="form-item">
+          <label class="form-label">导出格式</label>
+          <UiSegmented v-model="exportFormat" :options="[{ label: 'CSV 表格', value: 'csv' }, { label: 'JSON 数据', value: 'json' }]" />
+        </div>
+        <p class="export-note">
+          <Info :size="14" :stroke-width="2" />
           按当前筛选条件导出全部工单（最多 10000 条），不影响原数据。
-        </el-alert>
-      </el-form>
+        </p>
+      </div>
       <template #footer>
-        <el-button @click="exportVisible = false">取消</el-button>
-        <el-button type="primary" :loading="exporting" @click="doExport">
-          <Download :size="14" :stroke-width="2" />
-          <span style="margin-left: 4px">开始导出</span>
-        </el-button>
+        <UiButton variant="ghost" @click="exportVisible = false">取消</UiButton>
+        <UiButton variant="primary" :loading="exporting" @click="doExport">
+          <template #icon><Download :size="14" :stroke-width="2" /></template>
+          开始导出
+        </UiButton>
       </template>
-    </el-dialog>
+    </UiModal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import {
-  listTickets, submitTicket, batchDeleteTickets,
-  archiveTicket, exportTickets,
-} from '../api/ticket'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import {
-  Plus, SlidersHorizontal, ChevronDown, RotateCcw, Search,
-  Download, CheckSquare, Archive, ArchiveRestore, Trash2,
+  Download, Plus, Search, Funnel, RotateCcw, Archive, ArchiveRestore,
+  Trash2, ChevronRight, X, SquareCheckBig, Info,
 } from '@lucide/vue'
-import PageHeader from '../components/common/PageHeader.vue'
-import SectionCard from '../components/common/SectionCard.vue'
-import StatCard from '../components/common/StatCard.vue'
-import StatusBadge from '../components/common/StatusBadge.vue'
-import CategoryBadge from '../components/common/CategoryBadge.vue'
-import DateTimeText from '../components/common/DateTimeText.vue'
+import {
+  listTickets, submitTicket, batchDeleteTickets, archiveTicket, exportTickets,
+} from '../api/ticket'
+import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiSelect from '../ui/UiSelect.vue'
+import UiModal from '../ui/UiModal.vue'
+import UiSegmented from '../ui/UiSegmented.vue'
+import UiCheckbox from '../ui/UiCheckbox.vue'
+import UiPagination from '../ui/UiPagination.vue'
+import UiSkeleton from '../ui/UiSkeleton.vue'
+import UiEmpty from '../ui/UiEmpty.vue'
+import StatusPill from '../ui/StatusPill.vue'
+import CategoryTag from '../ui/CategoryTag.vue'
+import TimeText from '../ui/TimeText.vue'
+import StatCard from '../components/StatCard.vue'
+import { toast } from '../ui/toast'
+import { confirmDialog } from '../ui/confirm'
+import { useIsMobile } from '../composables/useMediaQuery'
+
+const router = useRouter()
+const isMobile = useIsMobile()
 
 const loading = ref(false)
 const rows = ref([])
 const total = ref(0)
+const filterOpen = ref(false)
+const selectMode = ref(false)
 const selected = ref([])
+
 const createVisible = ref(false)
-const dateRange = ref([])
-const filterExpanded = ref(true)
+const creating = ref(false)
 const exportVisible = ref(false)
 const exportFormat = ref('csv')
 const exporting = ref(false)
-const tableRef = ref(null)
-
-const isMobile = computed(() => window.innerWidth < 768)
-const dialogWidth = computed(() => isMobile.value ? '95vw' : '540px')
-const paginationLayout = computed(() =>
-  isMobile.value ? 'total, prev, pager, next' : 'total, sizes, prev, pager, next, jumper'
-)
 
 const filters = reactive({
   status: '',
@@ -287,17 +312,38 @@ const filters = reactive({
   page_size: 20,
 })
 
-const createForm = reactive({
-  question: '',
-  user_id: `sess_${Date.now()}`,
-  rag_result: '',
-})
+const createForm = reactive({ question: '', user_id: '', rag_result: '' })
+
+const statusOptions = [
+  { label: '全部', value: '' },
+  { label: '待处理', value: 'pending' },
+  { label: '处理中', value: 'processing' },
+  { label: '已答复', value: 'answered' },
+  { label: '已关闭', value: 'closed' },
+]
+
+const archivedOptions = [
+  { label: '全部', value: '' },
+  { label: '未归档', value: 'false' },
+  { label: '已归档', value: 'true' },
+]
 
 const counts = computed(() => ({
   pending: rows.value.filter((r) => r.status === 'pending').length,
   answered: rows.value.filter((r) => r.status === 'answered').length,
-  closed: rows.value.filter((r) => r.status === 'closed').length,
 }))
+
+const statItems = computed(() => [
+  { icon: 'Layers', label: '本页工单', value: rows.value.length, meta: '当前筛选下', accent: '#6366F1' },
+  { icon: 'Timer', label: '待处理', value: counts.value.pending, meta: '需尽快响应', accent: '#D98309' },
+  { icon: 'MessageSquareCheck', label: '已答复', value: counts.value.answered, meta: '等待复问', accent: '#0EA96E' },
+  { icon: 'Database', label: '全部工单', value: total.value, meta: '筛选范围内总数', accent: '#8B5CF6' },
+])
+
+const hasAdvFilter = computed(() => !!(filters.archived || filters.category || filters.startDate || filters.endDate))
+const hasAnyFilter = computed(
+  () => hasAdvFilter.value || !!filters.status || !!filters.q
+)
 
 const buildQuery = () => ({
   status: filters.status || undefined,
@@ -317,34 +363,97 @@ const reload = async () => {
     rows.value = data.items
     total.value = data.total
     selected.value = []
-  } catch (e) {} finally {
+  } catch (e) {
+    /* 拦截器已提示 */
+  } finally {
     loading.value = false
   }
 }
 
-const onDateChange = (val) => {
-  if (val && val.length === 2) {
-    filters.startDate = val[0]
-    filters.endDate = val[1]
-  } else {
-    filters.startDate = ''
-    filters.endDate = ''
-  }
-  reload()
-}
-
-const reset = () => {
-  filters.status = ''
-  filters.archived = ''
-  filters.category = ''
-  filters.q = ''
-  filters.startDate = ''
-  filters.endDate = ''
-  dateRange.value = []
+const onFilterChange = () => {
   filters.page = 1
   reload()
 }
 
+// 搜索防抖
+let searchTimer = null
+const onSearchInput = () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(onFilterChange, 450)
+}
+onBeforeUnmount(() => clearTimeout(searchTimer))
+
+const reset = () => {
+  Object.assign(filters, { status: '', archived: '', category: '', q: '', startDate: '', endDate: '', page: 1 })
+  reload()
+}
+
+// ─── 选择 ───
+const isSelected = (id) => selected.value.includes(id)
+const allSelected = computed(() => rows.value.length > 0 && selected.value.length === rows.value.length)
+const partialSelected = computed(() => selected.value.length > 0 && !allSelected.value)
+
+const toggleOne = (id) => {
+  const i = selected.value.indexOf(id)
+  if (i === -1) selected.value.push(id)
+  else selected.value.splice(i, 1)
+}
+const toggleAll = () => {
+  selected.value = allSelected.value ? [] : rows.value.map((r) => r.ticket_id)
+}
+const toggleSelectMode = () => {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selected.value = []
+}
+const exitBulk = () => {
+  selected.value = []
+  selectMode.value = false
+}
+
+const goDetail = (id) => router.push(`/tickets/${id}`)
+const onCardTap = (id) => {
+  if (selectMode.value) toggleOne(id)
+  else goDetail(id)
+}
+
+// ─── 批量操作 ───
+const onBulkArchive = async (archive) => {
+  const action = archive ? '归档' : '取消归档'
+  const ok = await confirmDialog({
+    title: `批量${action}`,
+    message: `确认对选中的 ${selected.value.length} 个工单执行「${action}」？`,
+    confirmText: `确认${action}`,
+  })
+  if (!ok) return
+  let okCount = 0, failCount = 0
+  for (const id of selected.value) {
+    try {
+      await archiveTicket(id, archive)
+      okCount++
+    } catch (e) { failCount++ }
+  }
+  toast.success(`${action}完成：成功 ${okCount}${failCount ? `，失败 ${failCount}` : ''}`)
+  exitBulk()
+  await reload()
+}
+
+const onBulkDelete = async () => {
+  const ok = await confirmDialog({
+    title: '批量删除',
+    message: `确认删除选中的 ${selected.value.length} 个工单？删除后不可在列表中查看。`,
+    confirmText: '确认删除',
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    const r = await batchDeleteTickets([...selected.value])
+    toast.success(`批量删除完成：${r.message || ''}`)
+    exitBulk()
+    await reload()
+  } catch (e) {}
+}
+
+// ─── 模拟提交 ───
 const openCreate = () => {
   createForm.question = ''
   createForm.user_id = `sess_${Date.now()}`
@@ -353,70 +462,20 @@ const openCreate = () => {
 }
 
 const doCreate = async () => {
-  if (!createForm.question.trim()) { ElMessage.warning('请填写问题'); return }
-  if (!createForm.user_id.trim()) { ElMessage.warning('请填写用户 ID'); return }
+  if (!createForm.question.trim()) { toast.warning('请填写问题'); return }
+  if (!createForm.user_id.trim()) { toast.warning('请填写用户 ID'); return }
+  creating.value = true
   try {
     const r = await submitTicket(createForm)
-    ElMessageBox.alert(r.message, `工单已创建：${r.ticket_id}`, {
-      confirmButtonText: '查看详情',
-    })
-      .then(() => location.assign(`/tickets/${r.ticket_id}`))
-      .catch(() => location.reload())
     createVisible.value = false
-  } catch (e) {}
-}
-
-const onSelectionChange = (rows) => {
-  selected.value = rows
-}
-const clearSelection = () => {
-  selected.value = []
-  nextTick(() => {
-    const table = document.querySelector('.ticket-table')
-    if (table) table.querySelectorAll('.el-checkbox.is-checked').forEach((el) => el.click())
-  })
-}
-
-const onBulkArchive = async (archive) => {
-  if (selected.value.length === 0) return
-  const action = archive ? '归档' : '取消归档'
-  try {
-    await ElMessageBox.confirm(
-      `确认对选中的 ${selected.value.length} 个工单执行「${action}」？`,
-      `批量${action}`,
-      { type: 'info', confirmButtonText: `确认${action}` }
-    )
-  } catch (e) { return }
-  let ok = 0, fail = 0
-  for (const row of selected.value) {
-    try {
-      await archiveTicket(row.ticket_id, archive)
-      ok++
-    } catch (e) { fail++ }
+    toast.success(`工单已创建：${r.ticket_id}`)
+    router.push(`/tickets/${r.ticket_id}`)
+  } catch (e) {} finally {
+    creating.value = false
   }
-  ElMessage.success(`${action}完成：成功 ${ok}，失败 ${fail}`)
-  clearSelection()
-  await reload()
 }
 
-const onBulkDelete = async () => {
-  if (selected.value.length === 0) return
-  try {
-    await ElMessageBox.confirm(
-      `确认删除选中的 ${selected.value.length} 个工单？此操作可在筛选"包含已删除"中查看。`,
-      '批量删除',
-      { type: 'warning', confirmButtonText: '确认删除' }
-    )
-  } catch (e) { return }
-  try {
-    const ids = selected.value.map((r) => r.ticket_id)
-    const r = await batchDeleteTickets(ids)
-    ElMessage.success(`批量删除完成：${r.message || ''}`)
-    clearSelection()
-    await reload()
-  } catch (e) {}
-}
-
+// ─── 导出 ───
 const openExport = () => {
   exportFormat.value = 'csv'
   exportVisible.value = true
@@ -439,152 +498,254 @@ const doExport = async () => {
     a.download = filename
     a.click()
     URL.revokeObjectURL(url)
-    ElMessage.success(`已导出 ${filename}（${(blob.size / 1024).toFixed(1)} KB）`)
+    toast.success(`已导出 ${filename}（${(blob.size / 1024).toFixed(1)} KB）`)
     exportVisible.value = false
   } catch (e) {
-    ElMessage.error('导出失败：' + (e?.response?.data?.error_message || e.message))
+    toast.error('导出失败：' + (e?.response?.data?.error_message || e.message))
   } finally {
     exporting.value = false
   }
 }
 
-onMounted(() => {
-  reload()
-  if (window.innerWidth < 768) filterExpanded.value = false
-})
+onMounted(reload)
 </script>
 
 <style scoped>
-.ticket-list {
+.ticket-list { display: flex; flex-direction: column; gap: 18px; }
+
+/* ─── 页头 ─── */
+.list-head {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
 }
+.head-text h1 {
+  margin: 0 0 3px;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-1);
+}
+.head-text p { margin: 0; font-size: 13px; color: var(--text-3); }
+.head-actions { display: flex; gap: 10px; flex-shrink: 0; }
+@media (max-width: 767px) {
+  .head-text h1 { font-size: 19px; }
+  .head-text p { font-size: 12px; }
+}
 
-.btn-label { display: inline; }
-@media (max-width: 768px) { .btn-label { display: none; } }
-
-.stats-row {
+/* ─── 统计 ─── */
+.stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 14px;
 }
-@media (max-width: 900px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 480px) { .stats-row { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
+@media (max-width: 960px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .stats-grid { gap: 10px; } }
 
-.filter-pad { padding: 0; }
-.filter-header {
+/* ─── 工具栏 ─── */
+.toolbar { padding: 12px 16px; }
+.toolbar-main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  user-select: none;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.filter-title { display: inline-flex; align-items: center; gap: 6px; }
-.chev { transition: transform 0.2s; color: var(--text-tertiary); }
-.chev.rotated { transform: rotate(180deg); }
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.search-input { width: 230px; }
+@media (max-width: 767px) {
+  .toolbar-main { flex-direction: column; align-items: stretch; }
+  .toolbar-right { width: 100%; }
+  .search-input { flex: 1; width: auto; }
+}
 
-.filter-body {
-  max-height: 0;
+.filter-on {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+  background: var(--primary-soft) !important;
+}
+
+/* 高级筛选折叠 */
+.adv-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--d-base) var(--ease-out);
+}
+.adv-wrap.open { grid-template-rows: 1fr; }
+.adv-inner {
   overflow: hidden;
-  transition: max-height 0.3s ease;
-  border-top: 1px solid transparent;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 16px;
+  align-items: end;
 }
-.filter-body.expanded {
-  max-height: 300px;
-  padding: 0 20px 16px;
-  border-top-color: var(--border-soft);
-}
-
-@media (min-width: 769px) {
-  .filter-header { display: none; }
-  .filter-body { max-height: 300px; padding: 0 20px 16px; border-top: 1px solid var(--border-soft); }
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-:deep(.ticket-table .el-table__row) {
-  transition: background var(--transition-fast);
-}
-:deep(.ticket-table .el-table__row:hover > td) {
-  background: var(--color-primary-soft) !important;
-}
-
-.ticket-id {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
+.adv-wrap.open .adv-inner { padding-top: 14px; }
+.adv-field label {
+  display: block;
   font-size: 12px;
-  color: var(--color-primary);
-  cursor: pointer;
+  color: var(--text-3);
+  margin-bottom: 5px;
   font-weight: 500;
-  transition: color var(--transition-fast);
-  word-break: keep-all;
 }
-.ticket-id:hover { color: var(--color-primary-dark); text-decoration: underline; }
+.adv-field .ui-select, .adv-field .ui-field { width: 100%; }
+.adv-actions { display: flex; justify-content: flex-end; }
 
-.question-cell {
-  color: var(--text-primary);
+/* ─── 列表卡片 ─── */
+.list-card { overflow: hidden; }
+.list-loading { padding: 8px 20px; }
+
+/* 桌面表格 */
+.t-head, .t-row {
+  display: grid;
+  grid-template-columns: 40px 158px minmax(0, 1fr) 110px 116px 150px 30px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+}
+.t-head {
+  height: 42px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-sink);
+}
+.t-row {
+  min-height: 62px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.t-row:last-child { border-bottom: none; }
+.t-row:hover { background: var(--bg-hover); }
+.t-row.selected { background: var(--primary-soft); }
+.t-cell { min-width: 0; display: flex; align-items: center; }
+.c-check { justify-content: center; }
+.c-arrow { justify-content: center; color: var(--text-3); opacity: 0; transition: all var(--d-fast) var(--ease-out); }
+.t-row:hover .c-arrow { opacity: 1; transform: translateX(2px); }
+
+.tid {
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.q-text { font-size: 13.5px; color: var(--text-1); line-height: 1.55; }
+.c-status { gap: 6px; }
+
+.archived-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+/* 移动端卡片 */
+.m-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out);
+}
+.m-card:last-child { border-bottom: none; }
+.m-card:active { background: var(--bg-hover); }
+.m-card.selected { background: var(--primary-soft); }
+.m-check { display: flex; align-items: center; }
+.m-body { flex: 1; min-width: 0; }
+.m-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.m-time { margin-left: auto; }
+.m-q {
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
+  color: var(--text-1);
+  margin-bottom: 8px;
 }
+.m-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.m-chev { margin-left: auto; color: var(--text-3); }
 
-.pagination-wrap {
-  padding: 16px 20px;
+/* ─── 分页 ─── */
+.list-pager {
   display: flex;
   justify-content: flex-end;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-soft);
 }
-@media (max-width: 768px) {
-  .pagination-wrap { justify-content: center; }
-}
+@media (max-width: 767px) { .list-pager { justify-content: center; } }
 
-.archived-tag {
+/* ─── 浮动批量条 ─── */
+.bulk-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--r-full);
+  box-shadow: var(--shadow-lg);
+}
+@media (max-width: 767px) {
+  .bulk-bar { bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px) + 14px); }
+}
+.bulk-count { font-size: 13px; color: var(--text-2); padding: 0 6px; white-space: nowrap; }
+.bulk-count strong { color: var(--primary); }
+.bulk-divider { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+.bulk-danger { color: var(--danger) !important; }
+.bulk-danger:hover { background: var(--danger-soft) !important; }
+.bulk-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px; height: 24px;
-  border-radius: 6px;
-  background: var(--bg-base);
-  color: var(--text-tertiary);
-  border: 1px solid var(--border-soft);
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
 }
-.muted { color: var(--text-tertiary); }
+.bulk-close:hover { background: var(--bg-active); color: var(--text-1); }
 
-/* 多选操作条 */
-.bulk-bar {
+/* ─── 表单 ─── */
+.form-stack { display: flex; flex-direction: column; gap: 16px; }
+.form-item { display: flex; flex-direction: column; gap: 7px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.form-label em { color: var(--danger); font-style: normal; }
+
+.export-note {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  background: var(--color-primary-soft);
-  border-bottom: 1px solid var(--border-soft);
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: var(--r-md);
+  background: var(--primary-soft);
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.6;
 }
-.bulk-info {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-.bulk-info strong { color: var(--color-primary); font-weight: 600; }
-.bulk-icon { color: var(--color-primary); }
-.bulk-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
-
-.slide-down-enter-active, .slide-down-leave-active {
-  transition: max-height 0.2s ease, opacity 0.2s ease;
-  overflow: hidden;
-}
-.slide-down-enter-from, .slide-down-leave-to {
-  max-height: 0; opacity: 0;
-}
-.slide-down-enter-to, .slide-down-leave-from {
-  max-height: 60px; opacity: 1;
-}
+.export-note svg { flex-shrink: 0; margin-top: 2px; color: var(--primary); }
 </style>

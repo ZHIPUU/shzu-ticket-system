@@ -1,100 +1,147 @@
 <template>
-  <div class="settings">
-    <PageHeader title="个人设置" description="管理账号密码与界面偏好" />
+  <div class="settings-page">
+    <header class="page-head anim-fade-up">
+      <div class="head-text">
+        <h1>个人设置</h1>
+        <p>管理账号密码与界面偏好</p>
+      </div>
+    </header>
 
-    <!-- 修改密码 -->
-    <SectionCard
-      title="账号密码"
-      icon="Lock"
-      :padded="false"
-    >
-      <template #header>
-        <el-alert
-          v-if="mustChangePwd"
-          type="warning"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 4px"
-        >
-          <template #title>首次登录需要修改密码</template>
-        </el-alert>
-      </template>
-      <div class="card-pad">
-        <div v-if="mustChangePwd" class="pwd-hint">
-          为保障账号安全，请在继续操作前修改默认密码
+    <!-- 强制改密码提示 -->
+    <div v-if="mustChangePwd" class="pwd-banner anim-fade-up">
+      <ShieldAlert :size="18" :stroke-width="2" />
+      <div class="banner-text">
+        <strong>首次登录需要修改密码</strong>
+        <span>为保障账号安全，请在继续操作前修改默认密码</span>
+      </div>
+    </div>
+
+    <!-- ═══ 账号密码 ═══ -->
+    <section class="card block anim-stagger" style="--i: 1">
+      <header class="block-head">
+        <span class="block-icon"><Lock :size="16" :stroke-width="2" /></span>
+        <h3>账号密码</h3>
+      </header>
+      <div class="block-body form-stack">
+        <div class="form-item">
+          <label class="form-label">当前密码</label>
+          <UiInput v-model="pwdForm.old_password" type="password" placeholder="请输入当前密码" />
         </div>
-        <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="100px">
-          <el-form-item label="当前密码" prop="old_password">
-            <el-input v-model="pwdForm.old_password" type="password" show-password placeholder="请输入当前密码" />
-          </el-form-item>
-          <el-form-item label="新密码" prop="new_password">
-            <el-input v-model="pwdForm.new_password" type="password" show-password placeholder="至少 8 位，含字母和数字" />
-            <div class="pwd-strength" v-if="pwdForm.new_password">
-              <div class="strength-bar" :class="strengthClass"></div>
-              <span class="strength-text">{{ strengthText }}</span>
+        <div class="form-item">
+          <label class="form-label">新密码</label>
+          <UiInput v-model="pwdForm.new_password" type="password" placeholder="至少 8 位，含字母和数字" />
+          <div v-if="pwdForm.new_password" class="strength">
+            <div class="strength-track">
+              <div class="strength-fill" :class="strengthClass" :style="{ width: strength * 25 + '%' }" />
             </div>
-          </el-form-item>
-          <el-form-item label="确认新密码" prop="confirm">
-            <el-input v-model="pwdForm.confirm" type="password" show-password placeholder="再次输入新密码" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="submitting" @click="doChangePwd">修改密码</el-button>
-          </el-form-item>
-        </el-form>
+            <span class="strength-text" :class="strengthClass">{{ strengthText }}</span>
+          </div>
+        </div>
+        <div class="form-item">
+          <label class="form-label">确认新密码</label>
+          <UiInput
+            v-model="pwdForm.confirm"
+            type="password"
+            placeholder="再次输入新密码"
+            @enter="doChangePwd"
+          />
+          <p v-if="pwdForm.confirm && pwdForm.confirm !== pwdForm.new_password" class="field-error">两次输入的密码不一致</p>
+        </div>
+        <div class="form-submit">
+          <UiButton variant="primary" :loading="submitting" @click="doChangePwd">
+            <template #icon><Save :size="14" :stroke-width="2" /></template>
+            修改密码
+          </UiButton>
+        </div>
       </div>
-    </SectionCard>
+    </section>
 
-    <!-- 外观 -->
-    <SectionCard title="外观" icon="Sun" :padded="false">
-      <div class="card-pad">
-        <el-form label-width="100px">
-          <el-form-item label="主题模式">
-            <el-radio-group v-model="theme" size="large">
-              <el-radio-button label="light">
-                <span class="radio-content">
-                  <Sun :size="16" :stroke-width="2" />
-                  亮色
-                </span>
-              </el-radio-button>
-              <el-radio-button label="dark">
-                <span class="radio-content">
-                  <Moon :size="16" :stroke-width="2" />
-                  暗色
-                </span>
-              </el-radio-button>
-            </el-radio-group>
-          </el-form-item>
-        </el-form>
+    <!-- ═══ 外观 ═══ -->
+    <section class="card block anim-stagger" style="--i: 2">
+      <header class="block-head">
+        <span class="block-icon"><Sun :size="16" :stroke-width="2" /></span>
+        <h3>外观主题</h3>
+      </header>
+      <div class="block-body">
+        <div class="theme-grid">
+          <button
+            v-for="t in themeTiles"
+            :key="t.value"
+            class="theme-tile"
+            :class="{ active: theme === t.value }"
+            @click="theme = t.value"
+          >
+            <span class="tile-preview" :data-theme="t.value">
+              <span class="pv-side" />
+              <span class="pv-main">
+                <span class="pv-bar" />
+                <span class="pv-line w80" />
+                <span class="pv-line w60" />
+              </span>
+            </span>
+            <span class="tile-label">
+              <component :is="t.icon" :size="14" :stroke-width="2" />
+              {{ t.label }}
+            </span>
+            <span class="tile-check"><Check :size="12" :stroke-width="3" /></span>
+          </button>
+        </div>
       </div>
-    </SectionCard>
+    </section>
 
-    <!-- 关于 -->
-    <SectionCard title="关于" icon="Info" :padded="false">
-      <div class="card-pad">
-        <el-descriptions :column="1" border>
-          <el-descriptions-item label="当前用户">{{ userStore.user?.display_name || userStore.user?.username }}（{{ userStore.user?.role === 'admin' ? '管理员' : '工作人员' }}）</el-descriptions-item>
-          <el-descriptions-item label="登录到期">{{ formatExp(userStore.expiresAt) }}</el-descriptions-item>
-          <el-descriptions-item label="系统名称">石小易 AI 迎新助手 · 工单管理系统</el-descriptions-item>
-          <el-descriptions-item label="版本">v3.0.0</el-descriptions-item>
-          <el-descriptions-item label="后端">Go 1.22 + Gin + GORM + SQLite</el-descriptions-item>
-          <el-descriptions-item label="前端">Vue 3 + Vite + Element Plus + Lucide</el-descriptions-item>
-          <el-descriptions-item label="鉴权">JWT（后台） + API Key（智能体）</el-descriptions-item>
-        </el-descriptions>
+    <!-- ═══ 关于 ═══ -->
+    <section class="card block anim-stagger" style="--i: 3">
+      <header class="block-head">
+        <span class="block-icon"><Info :size="16" :stroke-width="2" /></span>
+        <h3>关于系统</h3>
+      </header>
+      <div class="block-body info-list">
+        <div class="info-row">
+          <span class="info-label">当前用户</span>
+          <span class="info-value">
+            {{ userStore.user?.display_name || userStore.user?.username }}
+            <span class="role-pill" :data-role="userStore.user?.role">{{ userStore.user?.role === 'admin' ? '管理员' : '工作人员' }}</span>
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">登录到期</span>
+          <span class="info-value tnum">{{ formatExp(userStore.expiresAt) }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">系统名称</span>
+          <span class="info-value">石小易 AI 迎新助手 · 工单管理系统</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">版本</span>
+          <span class="info-value mono">v3.0.0</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">后端</span>
+          <span class="info-value">Go 1.22 + Gin + GORM + SQLite</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">前端</span>
+          <span class="info-value">Vue 3 + Vite + Lucide</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">鉴权</span>
+          <span class="info-value">JWT（后台） + API Key（智能体）</span>
+        </div>
       </div>
-    </SectionCard>
+    </section>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Sun, Moon } from '@lucide/vue'
+import { Lock, Sun, Moon, Check, Info, Save, ShieldAlert } from '@lucide/vue'
 import { changePassword } from '../api/auth'
 import { useUserStore } from '../stores/user'
 import { useTheme } from '../composables/useTheme'
-import PageHeader from '../components/common/PageHeader.vue'
-import SectionCard from '../components/common/SectionCard.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
+import { toast } from '../ui/toast'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -102,38 +149,15 @@ const { theme } = useTheme()
 
 const mustChangePwd = computed(() => userStore.mustChangePassword)
 
-const pwdFormRef = ref(null)
 const submitting = ref(false)
-const pwdForm = reactive({
-  old_password: '',
-  new_password: '',
-  confirm: '',
-})
+const pwdForm = reactive({ old_password: '', new_password: '', confirm: '' })
 
-const validateConfirm = (_, value, callback) => {
-  if (value !== pwdForm.new_password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
+const themeTiles = [
+  { label: '亮色模式', value: 'light', icon: Sun },
+  { label: '暗色模式', value: 'dark', icon: Moon },
+]
 
-const pwdRules = {
-  old_password: [{ required: true, min: 6, message: '请输入当前密码', trigger: 'blur' }],
-  new_password: [
-    { required: true, min: 8, max: 128, message: '至少 8 位', trigger: 'blur' },
-    {
-      pattern: /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/,
-      message: '必须同时包含字母和数字',
-      trigger: 'blur',
-    },
-  ],
-  confirm: [
-    { required: true, message: '请再次输入新密码', trigger: 'blur' },
-    { validator: validateConfirm, trigger: 'blur' },
-  ],
-}
-
+// ─── 密码强度 ───
 const strength = computed(() => {
   const p = pwdForm.new_password
   if (!p) return 0
@@ -143,9 +167,8 @@ const strength = computed(() => {
   if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++
   if (/\d/.test(p)) s++
   if (/[^A-Za-z0-9]/.test(p)) s++
-  return Math.min(s, 4)
+  return Math.max(1, Math.min(s, 4))
 })
-
 const strengthClass = computed(() => ['', 'weak', 'medium', 'strong', 'very-strong'][strength.value])
 const strengthText = computed(() => ['', '弱', '一般', '良好', '很强'][strength.value])
 
@@ -155,78 +178,238 @@ const formatExp = (iso) => {
 }
 
 const doChangePwd = async () => {
-  await pwdFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    submitting.value = true
-    try {
-      await changePassword({
-        old_password: pwdForm.old_password,
-        new_password: pwdForm.new_password,
-      })
-      ElMessage.success('密码修改成功')
-      pwdForm.old_password = ''
-      pwdForm.new_password = ''
-      pwdForm.confirm = ''
-      await userStore.refresh()
-      if (mustChangePwd.value) {
-        router.push('/tickets')
-      }
-    } catch (e) {} finally {
-      submitting.value = false
-    }
-  })
+  if (submitting.value) return
+  if (!pwdForm.old_password) { toast.warning('请输入当前密码'); return }
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,128}$/.test(pwdForm.new_password)) {
+    toast.warning('新密码至少 8 位，且必须包含字母和数字'); return
+  }
+  if (pwdForm.confirm !== pwdForm.new_password) {
+    toast.warning('两次输入的密码不一致'); return
+  }
+  submitting.value = true
+  try {
+    await changePassword({ old_password: pwdForm.old_password, new_password: pwdForm.new_password })
+    toast.success('密码修改成功')
+    pwdForm.old_password = ''
+    pwdForm.new_password = ''
+    pwdForm.confirm = ''
+    await userStore.refresh()
+    if (mustChangePwd.value) router.push('/tickets')
+  } catch (e) {} finally {
+    submitting.value = false
+  }
 }
 </script>
 
 <style scoped>
-.settings {
+.settings-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 800px;
+  gap: 18px;
+  max-width: 720px;
 }
 
-.card-pad {
-  padding: 20px;
+.page-head h1 {
+  margin: 0 0 3px;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-1);
 }
+.head-text p { margin: 0; font-size: 13px; color: var(--text-3); }
+@media (max-width: 767px) { .page-head h1 { font-size: 19px; } }
 
-.pwd-hint {
-  margin-bottom: 16px;
-  color: var(--text-secondary);
-  font-size: 13px;
+/* ─── 强制改密横幅 ─── */
+.pwd-banner {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 18px;
+  border-radius: var(--r-lg);
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  color: var(--warning);
 }
+.banner-text { display: flex; flex-direction: column; gap: 1px; }
+.banner-text strong { font-size: 13.5px; color: var(--text-1); }
+.banner-text span { font-size: 12.5px; color: var(--text-2); }
 
-.radio-content {
+/* ─── 通用块 ─── */
+.block { overflow: hidden; }
+.block-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.block-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.block-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+}
+.block-body { padding: 20px; }
+
+/* ─── 表单 ─── */
+.form-stack { display: flex; flex-direction: column; gap: 15px; }
+.form-item { display: flex; flex-direction: column; gap: 7px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.field-error { margin: 0; font-size: 12px; color: var(--danger); }
+.form-submit { display: flex; justify-content: flex-end; }
+
+/* ─── 强度条 ─── */
+.strength { display: flex; align-items: center; gap: 10px; }
+.strength-track {
+  flex: 1;
+  max-width: 180px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.strength-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width var(--d-base) var(--ease-out), background var(--d-base);
+}
+.strength-fill.weak { background: var(--danger); }
+.strength-fill.medium { background: var(--warning); }
+.strength-fill.strong { background: #84CC16; }
+.strength-fill.very-strong { background: var(--success); }
+.strength-text { font-size: 12px; color: var(--text-3); }
+.strength-text.weak { color: var(--danger); }
+.strength-text.medium { color: var(--warning); }
+.strength-text.strong, .strength-text.very-strong { color: var(--success); }
+
+/* ─── 主题瓷贴 ─── */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+@media (max-width: 480px) { .theme-grid { grid-template-columns: 1fr; } }
+
+.theme-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: all var(--d-fast) var(--ease-out);
+}
+.theme-tile:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.theme-tile.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft-2);
 }
 
-.pwd-strength {
-  margin-top: 8px;
+.tile-preview {
+  display: flex;
+  height: 74px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+.tile-preview[data-theme="light"] { background: #F3F4F9; }
+.tile-preview[data-theme="dark"] { background: #0B0D15; }
+
+.pv-side { width: 26%; }
+.tile-preview[data-theme="light"] .pv-side { background: #FFFFFF; border-right: 1px solid #E8E9F0; }
+.tile-preview[data-theme="dark"] .pv-side { background: #131624; border-right: 1px solid #232741; }
+
+.pv-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+}
+.pv-bar {
+  height: 8px;
+  width: 55%;
+  border-radius: 4px;
+  background: var(--gradient-brand);
+  opacity: 0.85;
+}
+.pv-line { height: 6px; border-radius: 3px; }
+.pv-line.w80 { width: 80%; }
+.pv-line.w60 { width: 60%; }
+.tile-preview[data-theme="light"] .pv-line { background: #DFE1EC; }
+.tile-preview[data-theme="dark"] .pv-line { background: #262B44; }
+
+.tile-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.theme-tile.active .tile-label { color: var(--primary); font-weight: 600; }
+
+.tile-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all var(--d-base) var(--ease-spring);
+}
+.theme-tile.active .tile-check { opacity: 1; transform: scale(1); }
+
+/* ─── 信息列表 ─── */
+.info-list { display: flex; flex-direction: column; }
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.info-row:last-child { border-bottom: none; }
+.info-label { width: 72px; flex-shrink: 0; font-size: 12.5px; color: var(--text-3); }
+.info-value {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
+  color: var(--text-1);
+  min-width: 0;
+  flex-wrap: wrap;
 }
-.strength-bar {
-  height: 4px;
-  width: 80px;
-  border-radius: 2px;
-  background: var(--bg-base);
-  position: relative;
-  overflow: hidden;
+
+.role-pill {
+  display: inline-flex;
+  padding: 2px 9px;
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--info-soft);
+  color: var(--info);
 }
-.strength-bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  width: 0;
-  transition: all var(--transition-base);
-}
-.strength-bar.weak::after { width: 25%; background: var(--color-danger); }
-.strength-bar.medium::after { width: 50%; background: var(--color-warning); }
-.strength-bar.strong::after { width: 75%; background: var(--color-success); }
-.strength-bar.very-strong::after { width: 100%; background: var(--color-success); }
-.strength-text { color: var(--text-tertiary); }
+.role-pill[data-role="admin"] { background: var(--warning-soft); color: var(--warning); }
 </style>

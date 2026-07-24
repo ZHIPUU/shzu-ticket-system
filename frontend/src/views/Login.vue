@@ -1,68 +1,78 @@
 <template>
   <div class="login-page">
-    <div class="login-bg" :class="{ dark: isDark }">
-      <div class="blob blob-1"></div>
-      <div class="blob blob-2"></div>
-      <div class="blob blob-3"></div>
+    <!-- 极光背景 -->
+    <div class="aurora" aria-hidden="true">
+      <div class="blob b1" />
+      <div class="blob b2" />
+      <div class="blob b3" />
+      <div class="grid-mask" />
     </div>
 
-    <div class="login-container">
-      <div class="brand-area">
-        <div class="logo">
-          <TicketsPlane :size="32" :stroke-width="2" />
+    <div class="login-wrap">
+      <div class="login-card anim-fade-up">
+        <div class="brand">
+          <div class="brand-logo">
+            <TicketsPlane :size="26" :stroke-width="2" />
+          </div>
+          <h1 class="brand-name">石小易工单</h1>
+          <p class="brand-sub">迎新智能体 · 工单管理后台</p>
         </div>
-        <h1 class="brand-name">石小易工单</h1>
-        <p class="brand-sub">迎新智能体后台管理系统</p>
-      </div>
 
-      <el-card class="login-card" shadow="never">
-        <h2 class="form-title">登录</h2>
-        <p class="form-sub">使用您的账号继续</p>
+        <form class="login-form" @submit.prevent="onSubmit">
+          <UiInput
+            v-model="form.username"
+            size="lg"
+            placeholder="用户名"
+            clearable
+            autofocus
+            @enter="onSubmit"
+          >
+            <template #prefix><User :size="16" :stroke-width="2" /></template>
+          </UiInput>
 
-        <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="onSubmit" size="large">
-          <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="用户名" :prefix-icon="User" clearable autofocus />
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input v-model="form.password" type="password" placeholder="密码" :prefix-icon="Lock" show-password
-              @keyup.enter="onSubmit" />
-          </el-form-item>
-          <el-form-item v-if="errorMsg">
-            <el-alert :title="errorMsg" type="error" :closable="false" show-icon />
-          </el-form-item>
-          <el-button type="primary" size="large" :loading="loading" @click="onSubmit" class="submit-btn">
-            登录
-          </el-button>
-        </el-form>
+          <UiInput
+            v-model="form.password"
+            type="password"
+            size="lg"
+            placeholder="密码"
+            @enter="onSubmit"
+          >
+            <template #prefix><Lock :size="16" :stroke-width="2" /></template>
+          </UiInput>
+
+          <p v-if="errorMsg" :key="errorMsg" class="login-error anim-shake">
+            <CircleAlert :size="14" :stroke-width="2.2" />
+            <span>{{ errorMsg }}</span>
+          </p>
+
+          <UiButton variant="primary" size="lg" block :loading="loading" type="submit">
+            登 录
+          </UiButton>
+        </form>
 
         <div class="login-tips">
-          <p>首次部署默认账号：<code>admin / admin123</code></p>
-          <p>登录后会强制要求修改密码</p>
+          <p>首次部署默认账号 <code>admin / admin123</code>，登录后需修改密码</p>
         </div>
-      </el-card>
-
-      <div class="footer">
-        © 2026 石河子大学信息化中心 · 石小易 AI 迎新助手
       </div>
+
+      <p class="login-footer anim-fade-up" style="--i: 3">© 2026 石河子大学信息化中心 · 石小易 AI 迎新助手</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
-import { TicketsPlane } from '@lucide/vue'
+import { TicketsPlane, User, Lock, CircleAlert } from '@lucide/vue'
+import UiInput from '../ui/UiInput.vue'
+import UiButton from '../ui/UiButton.vue'
+import { toast } from '../ui/toast'
 import { useUserStore } from '../stores/user'
-import { useTheme } from '../composables/useTheme'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { isDark } = useTheme()
 
-const formRef = ref(null)
 const loading = ref(false)
 const errorMsg = ref('')
 
@@ -71,32 +81,26 @@ const form = reactive({
   password: '',
 })
 
-const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-}
-
 const onSubmit = async () => {
+  if (loading.value) return
   errorMsg.value = ''
-  await formRef.value.validate(async (valid) => {
-    if (!valid) return
-    loading.value = true
-    try {
-      const r = await userStore.login(form.username, form.password)
-      ElMessage.success(`欢迎回来，${r.user.display_name || r.user.username}`)
-      const redirect = route.query.redirect || '/tickets'
-      if (r.must_change_password) {
-        router.push('/settings')
-      } else {
-        router.push(redirect)
-      }
-    } catch (e) {
-      const detail = e.response?.data?.error_message || '登录失败'
-      errorMsg.value = detail
-    } finally {
-      loading.value = false
+  if (!form.username.trim()) { errorMsg.value = '请输入用户名'; return }
+  if (!form.password) { errorMsg.value = '请输入密码'; return }
+
+  loading.value = true
+  try {
+    const r = await userStore.login(form.username.trim(), form.password)
+    toast.success(`欢迎回来，${r.user.display_name || r.user.username}`)
+    if (r.must_change_password) {
+      router.push('/settings')
+    } else {
+      router.push(route.query.redirect || '/tickets')
     }
-  })
+  } catch (e) {
+    errorMsg.value = e.response?.data?.error_message || '登录失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -107,148 +111,156 @@ const onSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #F5F7FA 100%);
-  overflow: hidden;
-}
-html.dark .login-page {
-  background: linear-gradient(135deg, #0B0F19 0%, #0F1A2D 50%, #131E33 100%);
+  overflow: auto;
+  background: var(--bg-app);
 }
 
-.login-bg {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
+/* ── 极光背景 ── */
+.aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.5;
-  animation: float 20s ease-in-out infinite;
+  filter: blur(90px);
+  will-change: transform;
 }
-.blob-1 { width: 480px; height: 480px; background: #2563EB; top: -100px; left: -100px; }
-.blob-2 { width: 380px; height: 380px; background: #3B82F6; bottom: -80px; right: -80px; animation-delay: -7s; }
-.blob-3 { width: 320px; height: 320px; background: #60A5FA; top: 40%; left: 50%; animation-delay: -14s; opacity: 0.3; }
-@media (max-width: 768px) {
-  .blob-1 { width: 260px; height: 260px; top: -60px; left: -60px; }
-  .blob-2 { width: 200px; height: 200px; bottom: -40px; right: -40px; }
-  .blob-3 { display: none; }
+.b1 {
+  width: 520px; height: 520px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.55), transparent 65%);
+  top: -140px; left: -120px;
+  animation: drift-1 22s ease-in-out infinite;
 }
+.b2 {
+  width: 460px; height: 460px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.45), transparent 65%);
+  bottom: -120px; right: -100px;
+  animation: drift-2 26s ease-in-out infinite;
+}
+.b3 {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.35), transparent 65%);
+  top: 42%; left: 52%;
+  animation: drift-3 30s ease-in-out infinite;
+}
+html.dark .b1 { background: radial-gradient(circle, rgba(99, 102, 241, 0.35), transparent 65%); }
+html.dark .b2 { background: radial-gradient(circle, rgba(139, 92, 246, 0.3), transparent 65%); }
+html.dark .b3 { background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 65%); }
 
-@keyframes float {
+@keyframes drift-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(60px, -40px) scale(1.1); }
+  50% { transform: translate(70px, 50px) scale(1.12); }
+}
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, -40px) scale(1.08); }
+}
+@keyframes drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-80px, 60px) scale(0.92); }
 }
 
-.login-container {
+.grid-mask {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(99, 102, 241, 0.14) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black, transparent);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, black, transparent);
+}
+
+/* ── 内容 ── */
+.login-wrap {
   position: relative;
   z-index: 1;
   width: 100%;
   max-width: 420px;
-  padding: 24px;
+  padding: 24px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.brand-area {
-  text-align: center;
-  margin-bottom: 32px;
-  color: var(--text-primary);
+.login-card {
+  width: 100%;
+  padding: 36px 32px 28px;
+  border-radius: var(--r-xl);
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
 }
-.logo {
-  width: 64px;
-  height: 64px;
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .login-card { background: var(--bg-surface); }
+}
+
+.brand { text-align: center; margin-bottom: 28px; }
+.brand-logo {
+  width: 58px;
+  height: 58px;
   margin: 0 auto 16px;
-  background: var(--gradient-header);
-  border-radius: var(--radius-xl);
+  border-radius: 17px;
+  background: var(--gradient-brand);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+  box-shadow: var(--shadow-brand);
+  animation: float-y 3.6s ease-in-out infinite;
 }
 .brand-name {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0 0 4px;
+  margin: 0 0 5px;
+  font-size: 23px;
+  font-weight: 700;
   letter-spacing: -0.5px;
+  color: var(--text-1);
 }
-.brand-sub {
-  font-size: 13px;
-  color: var(--text-secondary);
+.brand-sub { margin: 0; font-size: 13px; color: var(--text-3); }
+
+.login-form { display: flex; flex-direction: column; gap: 14px; }
+
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0;
-}
-
-.login-card {
-  width: 100%;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
-  padding: 32px;
-}
-@media (max-width: 480px) { .login-card { padding: 24px 20px; } }
-html.dark .login-card {
-  background: var(--bg-surface);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-}
-
-.form-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 4px;
-  letter-spacing: -0.3px;
-}
-.form-sub {
-  color: var(--text-secondary);
+  padding: 9px 13px;
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 13px;
-  margin: 0 0 24px;
-}
-
-.submit-btn {
-  width: 100%;
-  background: var(--gradient-header);
-  border: none;
-  height: 44px;
-  font-size: 15px;
   font-weight: 500;
-  letter-spacing: 0.5px;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
-  transition: all var(--transition-base);
-}
-.submit-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
-  background: var(--gradient-header) !important;
 }
 
 .login-tips {
-  margin-top: 20px;
-  padding: 12px 14px;
-  background: var(--bg-base);
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--border-color);
+  margin-top: 22px;
+  padding: 11px 14px;
+  border-radius: var(--r-md);
+  border: 1px dashed var(--border-strong);
   font-size: 12px;
-  color: var(--text-tertiary);
+  color: var(--text-3);
   line-height: 1.7;
+  text-align: center;
 }
+.login-tips p { margin: 0; }
 .login-tips code {
-  background: var(--bg-elevated);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
-  color: var(--color-primary);
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 11.5px;
 }
 
-.footer {
-  margin-top: 24px;
-  color: var(--text-tertiary);
+.login-footer {
+  margin: 22px 0 0;
   font-size: 12px;
+  color: var(--text-3);
   text-align: center;
+  animation-delay: 260ms;
+}
+
+@media (max-width: 480px) {
+  .login-card { padding: 30px 22px 24px; }
+  .b3 { display: none; }
 }
 </style>

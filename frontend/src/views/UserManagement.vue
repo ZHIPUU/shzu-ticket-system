@@ -1,157 +1,205 @@
 <template>
-  <div class="user-mgmt">
-    <PageHeader title="用户管理" description="管理系统用户、角色和权限">
-      <template #actions>
-        <el-button type="primary" @click="openCreate">
-          <Plus :size="16" :stroke-width="2.4" />
-          <span>新建用户</span>
-        </el-button>
-      </template>
-    </PageHeader>
-
-    <SectionCard :padded="false">
-      <div class="table-wrapper">
-        <el-table :data="users" v-loading="loading" stripe>
-          <el-table-column prop="id" label="ID" width="60" />
-          <el-table-column prop="username" label="用户名" width="140" />
-          <el-table-column label="显示名" width="140">
-            <template #default="{ row }">{{ row.display_name || '—' }}</template>
-          </el-table-column>
-          <el-table-column prop="email" label="邮箱" min-width="180">
-            <template #default="{ row }">{{ row.email || '—' }}</template>
-          </el-table-column>
-          <el-table-column label="角色" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.role === 'admin' ? 'danger' : 'info'" size="small">
-                {{ row.role === 'admin' ? '管理员' : '工作人员' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="row.active ? 'success' : 'warning'" size="small">
-                {{ row.active ? '启用' : '已禁用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="需改密码" width="100">
-            <template #default="{ row }">
-              <span v-if="row.must_change_password" class="warn-text">⚠ 是</span>
-              <span v-else class="muted">—</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="最后登录" width="160">
-            <template #default="{ row }">
-              <DateTimeText v-if="row.last_login_at" :value="row.last_login_at" mode="datetime" />
-              <span v-else class="muted">从未</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="240" fixed="right">
-            <template #default="{ row }">
-              <el-button size="small" link type="primary" @click="openEdit(row)">
-                <Pencil :size="14" :stroke-width="2" />
-                <span style="margin-left: 4px">编辑</span>
-              </el-button>
-              <el-button size="small" link type="warning" @click="onResetPwd(row)">
-                <KeyRound :size="14" :stroke-width="2" />
-                <span style="margin-left: 4px">重置密码</span>
-              </el-button>
-              <el-button
-                size="small"
-                link
-                :type="row.active ? 'danger' : 'success'"
-                :disabled="row.id === currentUserId"
-                @click="onToggleActive(row)"
-              >
-                <component :is="row.active ? Ban : CheckCircle" :size="14" :stroke-width="2" />
-                <span style="margin-left: 4px">{{ row.active ? '禁用' : '启用' }}</span>
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+  <div class="users-page">
+    <!-- ═══ 页头 ═══ -->
+    <header class="page-head anim-fade-up">
+      <div class="head-text">
+        <h1>用户管理</h1>
+        <p>管理系统用户、角色和权限</p>
       </div>
-    </SectionCard>
+      <UiButton variant="primary" :icon-only="isMobile" @click="openCreate">
+        <template #icon><UserRoundPlus :size="16" :stroke-width="2.2" /></template>
+        <span v-if="!isMobile">新建用户</span>
+      </UiButton>
+    </header>
 
-    <!-- 新建用户 -->
-    <el-dialog v-model="createVisible" title="新建用户" :width="dialogWidth" :destroy-on-close="true">
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="84px">
-        <el-form-item label="用户名" required prop="username">
-          <el-input v-model="createForm.username" placeholder="3-64 字符" maxlength="64" />
-        </el-form-item>
-        <el-form-item label="初始密码" required prop="password">
-          <el-input v-model="createForm.password" type="password" show-password placeholder="至少 8 位，含字母和数字" />
-        </el-form-item>
-        <el-form-item label="角色" required prop="role">
-          <el-radio-group v-model="createForm.role">
-            <el-radio-button label="staff">工作人员</el-radio-button>
-            <el-radio-button label="admin">管理员</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="显示名" prop="display_name">
-          <el-input v-model="createForm.display_name" maxlength="64" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="createForm.email" maxlength="128" />
-        </el-form-item>
-      </el-form>
-      <el-alert type="info" :closable="false" show-icon style="margin: 0 0 16px">
-        <template #title>提示</template>
-        新建用户首次登录需强制修改密码
-      </el-alert>
-      <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="doCreate">创建</el-button>
-      </template>
-    </el-dialog>
+    <!-- ═══ 列表 ═══ -->
+    <div class="users-card card anim-stagger" style="--i: 1">
+      <div v-if="loading" class="list-loading"><UiSkeleton type="rows" :count="4" /></div>
 
-    <!-- 编辑用户 -->
-    <el-dialog v-model="editVisible" title="编辑用户" :width="dialogWidth" :destroy-on-close="true">
-      <el-form v-if="editing" :model="editing" label-width="84px">
-        <el-form-item label="用户名">
-          <el-input v-model="editing.username" disabled />
-        </el-form-item>
-        <el-form-item label="显示名">
-          <el-input v-model="editing.display_name" maxlength="64" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="editing.email" maxlength="128" />
-        </el-form-item>
-        <el-form-item label="角色">
-          <el-radio-group v-model="editing.role">
-            <el-radio-button label="staff">工作人员</el-radio-button>
-            <el-radio-button label="admin">管理员</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="editing.active" />
-        </el-form-item>
-        <el-form-item label="强制改密码">
-          <el-switch v-model="editing.must_change_password" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="doEdit">保存</el-button>
+      <UiEmpty v-else-if="!users.length" icon="Users" title="暂无用户" description="点击右上角新建第一个用户" />
+
+      <!-- 桌面表格 -->
+      <template v-else-if="!isMobile">
+        <div class="t-head">
+          <div class="t-cell c-user">用户</div>
+          <div class="t-cell c-email">邮箱</div>
+          <div class="t-cell c-role">角色</div>
+          <div class="t-cell c-status">状态</div>
+          <div class="t-cell c-login">最后登录</div>
+          <div class="t-cell c-ops">操作</div>
+        </div>
+        <div v-for="(u, i) in users" :key="u.id" class="t-row anim-stagger" :style="{ '--i': i }">
+          <div class="t-cell c-user">
+            <div class="u-avatar" :data-role="u.role">{{ letter(u) }}</div>
+            <div class="u-names">
+              <span class="u-display">{{ u.display_name || u.username }}</span>
+              <span class="u-username mono">@{{ u.username }}</span>
+            </div>
+            <span v-if="u.must_change_password" class="pwd-warn" title="下次登录需修改密码">
+              <ShieldAlert :size="13" :stroke-width="2.2" />
+            </span>
+          </div>
+          <div class="t-cell c-email"><span class="ellipsis">{{ u.email || '—' }}</span></div>
+          <div class="t-cell c-role"><span class="role-pill" :data-role="u.role">{{ u.role === 'admin' ? '管理员' : '工作人员' }}</span></div>
+          <div class="t-cell c-status"><span class="state-pill" :class="{ off: !u.active }">{{ u.active ? '启用' : '已禁用' }}</span></div>
+          <div class="t-cell c-login">
+            <TimeText v-if="u.last_login_at" :value="u.last_login_at" />
+            <span v-else class="muted">从未登录</span>
+          </div>
+          <div class="t-cell c-ops">
+            <UiButton variant="text" size="sm" @click="openEdit(u)">
+              <template #icon><Pencil :size="13" :stroke-width="2" /></template>编辑
+            </UiButton>
+            <UiButton variant="text" size="sm" @click="onResetPwd(u)">
+              <template #icon><KeyRound :size="13" :stroke-width="2" /></template>重置密码
+            </UiButton>
+            <UiButton
+              variant="text"
+              size="sm"
+              :class="u.active ? 'op-danger' : 'op-success'"
+              :disabled="u.id === currentUserId"
+              @click="onToggleActive(u)"
+            >
+              <template #icon>
+                <Ban v-if="u.active" :size="13" :stroke-width="2" />
+                <CircleCheck v-else :size="13" :stroke-width="2" />
+              </template>
+              {{ u.active ? '禁用' : '启用' }}
+            </UiButton>
+          </div>
+        </div>
       </template>
-    </el-dialog>
+
+      <!-- 移动卡片 -->
+      <template v-else>
+        <div v-for="(u, i) in users" :key="u.id" class="m-user anim-stagger" :style="{ '--i': i }">
+          <div class="u-avatar" :data-role="u.role">{{ letter(u) }}</div>
+          <div class="m-user-body">
+            <div class="m-user-top">
+              <span class="u-display">{{ u.display_name || u.username }}</span>
+              <span v-if="u.must_change_password" class="pwd-warn" title="下次登录需修改密码">
+                <ShieldAlert :size="13" :stroke-width="2.2" />
+              </span>
+              <span class="state-pill sm" :class="{ off: !u.active }">{{ u.active ? '启用' : '禁用' }}</span>
+            </div>
+            <div class="u-username mono">@{{ u.username }}<template v-if="u.email"> · {{ u.email }}</template></div>
+            <div class="m-user-meta">
+              <span class="role-pill" :data-role="u.role">{{ u.role === 'admin' ? '管理员' : '工作人员' }}</span>
+              <span class="muted last-login">
+                <TimeText v-if="u.last_login_at" :value="u.last_login_at" mode="relative" />
+                <template v-else>从未登录</template>
+              </span>
+            </div>
+          </div>
+          <UiDropdown :items="userActions(u)" placement="end" @select="(cmd) => onUserAction(cmd, u)">
+            <template #trigger>
+              <button class="m-kebab" aria-label="更多操作"><EllipsisVertical :size="17" :stroke-width="2" /></button>
+            </template>
+          </UiDropdown>
+        </div>
+      </template>
+    </div>
+
+    <!-- ═══ 新建用户 ═══ -->
+    <UiModal v-model="createVisible" title="新建用户" width="480px">
+      <div class="form-stack">
+        <div class="form-item">
+          <label class="form-label">用户名 <em>*</em></label>
+          <UiInput v-model="createForm.username" :maxlength="64" placeholder="3-64 个字符" clearable />
+        </div>
+        <div class="form-item">
+          <label class="form-label">初始密码 <em>*</em></label>
+          <UiInput v-model="createForm.password" type="password" placeholder="至少 8 位，含字母和数字" />
+        </div>
+        <div class="form-item">
+          <label class="form-label">角色 <em>*</em></label>
+          <UiSegmented v-model="createForm.role" :options="roleOptions" />
+        </div>
+        <div class="form-item">
+          <label class="form-label">显示名</label>
+          <UiInput v-model="createForm.display_name" :maxlength="64" placeholder="选填" clearable />
+        </div>
+        <div class="form-item">
+          <label class="form-label">邮箱</label>
+          <UiInput v-model="createForm.email" :maxlength="128" placeholder="选填" clearable />
+        </div>
+        <p class="form-note">
+          <Info :size="13" :stroke-width="2" />
+          新建用户首次登录需强制修改密码
+        </p>
+      </div>
+      <template #footer>
+        <UiButton variant="ghost" @click="createVisible = false">取消</UiButton>
+        <UiButton variant="primary" :loading="submitting" @click="doCreate">创建</UiButton>
+      </template>
+    </UiModal>
+
+    <!-- ═══ 编辑用户 ═══ -->
+    <UiModal v-model="editVisible" title="编辑用户" width="480px">
+      <div v-if="editing" class="form-stack">
+        <div class="form-item">
+          <label class="form-label">用户名</label>
+          <UiInput v-model="editing.username" disabled />
+        </div>
+        <div class="form-item">
+          <label class="form-label">显示名</label>
+          <UiInput v-model="editing.display_name" :maxlength="64" clearable />
+        </div>
+        <div class="form-item">
+          <label class="form-label">邮箱</label>
+          <UiInput v-model="editing.email" :maxlength="128" clearable />
+        </div>
+        <div class="form-item">
+          <label class="form-label">角色</label>
+          <UiSegmented v-model="editing.role" :options="roleOptions" />
+        </div>
+        <div class="switch-row">
+          <div class="switch-text">
+            <span class="switch-title">启用账号</span>
+            <span class="switch-desc">禁用后该用户无法登录系统</span>
+          </div>
+          <UiSwitch v-model="editing.active" :disabled="editing.id === currentUserId" />
+        </div>
+        <div class="switch-row">
+          <div class="switch-text">
+            <span class="switch-title">强制修改密码</span>
+            <span class="switch-desc">开启后将生成临时密码，用户下次登录需重设</span>
+          </div>
+          <UiSwitch v-model="editing.must_change_password" />
+        </div>
+      </div>
+      <template #footer>
+        <UiButton variant="ghost" @click="editVisible = false">取消</UiButton>
+        <UiButton variant="primary" :loading="submitting" @click="doEdit">保存</UiButton>
+      </template>
+    </UiModal>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Pencil, KeyRound, Ban, CheckCircle } from '@lucide/vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import {
+  UserRoundPlus, Pencil, KeyRound, Ban, CircleCheck, ShieldAlert,
+  EllipsisVertical, Info,
+} from '@lucide/vue'
 import { listUsers, createUser, updateUser } from '../api/auth'
 import { useUserStore } from '../stores/user'
-import PageHeader from '../components/common/PageHeader.vue'
-import SectionCard from '../components/common/SectionCard.vue'
-import DateTimeText from '../components/common/DateTimeText.vue'
+import UiButton from '../ui/UiButton.vue'
+import UiInput from '../ui/UiInput.vue'
+import UiModal from '../ui/UiModal.vue'
+import UiSegmented from '../ui/UiSegmented.vue'
+import UiSwitch from '../ui/UiSwitch.vue'
+import UiDropdown from '../ui/UiDropdown.vue'
+import UiSkeleton from '../ui/UiSkeleton.vue'
+import UiEmpty from '../ui/UiEmpty.vue'
+import TimeText from '../ui/TimeText.vue'
+import { toast } from '../ui/toast'
+import { confirmDialog, promptDialog } from '../ui/confirm'
+import { useIsMobile } from '../composables/useMediaQuery'
 
 const userStore = useUserStore()
+const isMobile = useIsMobile()
 const currentUserId = computed(() => userStore.user?.id)
-
-const isMobile = computed(() => window.innerWidth < 768)
-const dialogWidth = computed(() => isMobile.value ? '95vw' : '480px')
 
 const loading = ref(false)
 const users = ref([])
@@ -160,20 +208,35 @@ const editVisible = ref(false)
 const editing = ref(null)
 const submitting = ref(false)
 
-const createFormRef = ref(null)
-const createForm = reactive({
-  username: '',
-  password: '',
-  role: 'staff',
-  display_name: '',
-  email: '',
-})
+const createForm = reactive({ username: '', password: '', role: 'staff', display_name: '', email: '' })
 
-const createRules = {
-  username: [{ required: true, min: 3, max: 64, message: '3-64 字符', trigger: 'blur' }],
-  password: [{ required: true, min: 8, message: '至少 8 位', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
-  email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+const roleOptions = [
+  { label: '工作人员', value: 'staff' },
+  { label: '管理员', value: 'admin' },
+]
+
+const PWD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const letter = (u) => (u.display_name?.[0] || u.username?.[0] || '?').toUpperCase()
+
+const userActions = (u) => [
+  { label: '编辑资料', value: 'edit', icon: Pencil },
+  { label: '重置密码', value: 'reset', icon: KeyRound },
+  {
+    label: u.active ? '禁用账号' : '启用账号',
+    value: 'toggle',
+    icon: u.active ? Ban : CircleCheck,
+    danger: u.active,
+    disabled: u.id === currentUserId.value,
+    divided: true,
+  },
+]
+
+const onUserAction = (cmd, u) => {
+  if (cmd === 'edit') openEdit(u)
+  else if (cmd === 'reset') onResetPwd(u)
+  else if (cmd === 'toggle') onToggleActive(u)
 }
 
 const fetch = async () => {
@@ -186,30 +249,35 @@ const fetch = async () => {
   }
 }
 
+// ─── 新建 ───
 const openCreate = () => {
-  createForm.username = ''
-  createForm.password = ''
-  createForm.role = 'staff'
-  createForm.display_name = ''
-  createForm.email = ''
+  Object.assign(createForm, { username: '', password: '', role: 'staff', display_name: '', email: '' })
   createVisible.value = true
 }
 
 const doCreate = async () => {
-  await createFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    submitting.value = true
-    try {
-      await createUser(createForm)
-      ElMessage.success('用户创建成功')
-      createVisible.value = false
-      await fetch()
-    } catch (e) {} finally {
-      submitting.value = false
-    }
-  })
+  const f = createForm
+  if (f.username.trim().length < 3 || f.username.trim().length > 64) {
+    toast.warning('用户名需为 3-64 个字符'); return
+  }
+  if (!PWD_PATTERN.test(f.password)) {
+    toast.warning('密码至少 8 位，且必须包含字母和数字'); return
+  }
+  if (f.email && !EMAIL_PATTERN.test(f.email)) {
+    toast.warning('邮箱格式不正确'); return
+  }
+  submitting.value = true
+  try {
+    await createUser({ ...f, username: f.username.trim() })
+    toast.success('用户创建成功')
+    createVisible.value = false
+    await fetch()
+  } catch (e) {} finally {
+    submitting.value = false
+  }
 }
 
+// ─── 编辑 ───
 const openEdit = (row) => {
   editing.value = { ...row }
   editVisible.value = true
@@ -217,6 +285,9 @@ const openEdit = (row) => {
 
 const doEdit = async () => {
   if (!editing.value) return
+  if (editing.value.email && !EMAIL_PATTERN.test(editing.value.email)) {
+    toast.warning('邮箱格式不正确'); return
+  }
   submitting.value = true
   try {
     const payload = {
@@ -229,7 +300,7 @@ const doEdit = async () => {
       payload.password = 'temp-' + Math.random().toString(36).slice(2, 10)
     }
     await updateUser(editing.value.id, payload)
-    ElMessage.success('已更新')
+    toast.success('已更新')
     editVisible.value = false
     await fetch()
   } catch (e) {} finally {
@@ -237,32 +308,36 @@ const doEdit = async () => {
   }
 }
 
-const onResetPwd = (row) => {
-  ElMessageBox.prompt(
-    '请输入新密码（至少 8 位，含字母和数字）',
-    `重置 ${row.username} 的密码`,
-    {
-      inputPattern: /^(?=.*[A-Za-z])(?=.*\d).{8,128}$/,
-      inputErrorMessage: '至少 8 位，必须含字母和数字',
-      inputValue: '',
-      confirmButtonText: '确认重置',
-    }
-  )
-    .then(async ({ value }) => {
-      await updateUser(row.id, { password: value })
-      ElMessage.success('密码已重置，用户下次登录需修改')
-    })
-    .catch(() => {})
+// ─── 重置密码 ───
+const onResetPwd = async (row) => {
+  const val = await promptDialog({
+    title: `重置密码`,
+    message: `为用户 ${row.username} 设置新密码（至少 8 位，含字母和数字）`,
+    placeholder: '输入新密码…',
+    pattern: PWD_PATTERN,
+    patternMessage: '至少 8 位，必须含字母和数字',
+    confirmText: '确认重置',
+  })
+  if (val === null) return
+  try {
+    await updateUser(row.id, { password: val })
+    toast.success('密码已重置，用户下次登录需修改')
+  } catch (e) {}
 }
 
+// ─── 启用/禁用 ───
 const onToggleActive = async (row) => {
   const action = row.active ? '禁用' : '启用'
+  const ok = await confirmDialog({
+    title: `${action}用户`,
+    message: `确认${action}用户 ${row.username}？${row.active ? '禁用后其将无法登录。' : ''}`,
+    confirmText: `确认${action}`,
+    danger: row.active,
+  })
+  if (!ok) return
   try {
-    await ElMessageBox.confirm(`确认${action}用户 ${row.username}？`, `${action}用户`, {
-      type: row.active ? 'warning' : 'success',
-    })
     await updateUser(row.id, { active: !row.active })
-    ElMessage.success(`已${action}`)
+    toast.success(`已${action}`)
     await fetch()
   } catch (e) {}
 }
@@ -271,17 +346,165 @@ onMounted(fetch)
 </script>
 
 <style scoped>
-.user-mgmt {
+.users-page { display: flex; flex-direction: column; gap: 18px; }
+
+.page-head {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
 }
-
-.table-wrapper {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+.head-text h1 {
+  margin: 0 0 3px;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-1);
 }
+.head-text p { margin: 0; font-size: 13px; color: var(--text-3); }
+@media (max-width: 767px) { .head-text h1 { font-size: 19px; } }
 
-.muted { color: var(--text-tertiary); }
-.warn-text { color: var(--color-warning); }
+.users-card { overflow: hidden; }
+.list-loading { padding: 8px 20px; }
+
+/* ─── 桌面表格 ─── */
+.t-head, .t-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) 100px 90px 140px 250px;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+}
+.t-head {
+  height: 42px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-sink);
+}
+.t-row {
+  min-height: 66px;
+  border-bottom: 1px solid var(--border-soft);
+  transition: background var(--d-fast) var(--ease-out);
+}
+.t-row:last-child { border-bottom: none; }
+.t-row:hover { background: var(--bg-hover); }
+.t-cell { min-width: 0; display: flex; align-items: center; }
+
+.u-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: var(--gradient-brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.u-avatar[data-role="admin"] { background: linear-gradient(135deg, #F59E0B, #F97316); }
+.c-user { gap: 11px; }
+.u-names { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.u-display { font-size: 13.5px; font-weight: 600; color: var(--text-1); }
+.u-username { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-email { font-size: 13px; color: var(--text-2); }
+
+.pwd-warn { color: var(--warning); display: inline-flex; flex-shrink: 0; }
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--info-soft);
+  color: var(--info);
+  white-space: nowrap;
+}
+.role-pill[data-role="admin"] { background: var(--warning-soft); color: var(--warning); }
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--success-soft);
+  color: var(--success);
+  white-space: nowrap;
+}
+.state-pill.off { background: var(--danger-soft); color: var(--danger); }
+.state-pill.sm { padding: 2px 8px; font-size: 10.5px; }
+
+.c-ops { gap: 2px; }
+.op-danger { color: var(--danger) !important; }
+.op-danger:hover { background: var(--danger-soft) !important; }
+.op-success { color: var(--success) !important; }
+.op-success:hover { background: var(--success-soft) !important; }
+
+/* ─── 移动卡片 ─── */
+.m-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.m-user:last-child { border-bottom: none; }
+.m-user-body { flex: 1; min-width: 0; }
+.m-user-top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.m-user-meta { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+.last-login { font-size: 11.5px; }
+.m-kebab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.m-kebab:hover { background: var(--bg-hover); color: var(--text-1); }
+
+/* ─── 表单 ─── */
+.form-stack { display: flex; flex-direction: column; gap: 15px; }
+.form-item { display: flex; flex-direction: column; gap: 7px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.form-label em { color: var(--danger); font-style: normal; }
+
+.form-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 10px 13px;
+  border-radius: var(--r-md);
+  background: var(--primary-soft);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.form-note svg { color: var(--primary); flex-shrink: 0; }
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  background: var(--bg-sink);
+}
+.switch-text { display: flex; flex-direction: column; gap: 2px; }
+.switch-title { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
+.switch-desc { font-size: 12px; color: var(--text-3); }
 </style>

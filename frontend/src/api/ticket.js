@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
+import { toast } from '../ui/toast'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '/api/v1',
@@ -21,20 +21,20 @@ api.interceptors.response.use(
     const status = err.response?.status
     const detail = err.response?.data?.detail || err.response?.data?.error_message || err.message
     if (status === 401) {
-      ElMessage.error('登录已过期，请重新登录')
+      toast.error('登录已过期，请重新登录')
       localStorage.removeItem('ticket_token')
       localStorage.removeItem('ticket_user')
       // 路由守卫会处理跳转
     } else if (status === 403) {
-      ElMessage.error('权限不足：' + detail)
+      toast.error('权限不足：' + detail)
     } else if (status === 404) {
-      ElMessage.warning('工单不存在')
+      toast.warning('工单不存在')
     } else if (status === 422) {
-      ElMessage.warning('参数错误：' + detail)
+      toast.warning('参数错误：' + detail)
     } else if (status >= 500) {
-      ElMessage.error('服务器内部错误：' + detail)
+      toast.error('服务器内部错误：' + detail)
     } else if (err.code === 'ERR_NETWORK') {
-      ElMessage.error('网络异常，无法连接后端服务')
+      toast.error('网络异常，无法连接后端服务')
     }
     return Promise.reject(err)
   }

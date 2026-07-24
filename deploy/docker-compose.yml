@@ -14,7 +14,6 @@ services:
       - PORT=8000
       - TICKET_PREFIX=T
       - TZ=Asia/Shanghai
-      - RESET_ADMIN_TOKEN=${RESET_ADMIN_TOKEN:-}
     volumes:
       - ticket-data:/app/data
     healthcheck:
